@@ -1,0 +1,46 @@
+{
+  "name": "stage",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Browser-first app preview runtime for React Native and Expo projects.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome format . --write"
+  },
+  "keywords": ["expo", "react-native", "preview", "browser", "devtools"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/made-for-me/stage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/made-for-me/stage/issues"
+  },
+  "homepage": "https://github.com/made-for-me/stage#readme",
+  "files": ["dist", "LICENSE", "README.md"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.14.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

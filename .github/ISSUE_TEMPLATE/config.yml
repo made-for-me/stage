@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security
+    url: https://github.com/made-for-me/stage/security
+    about: Report security vulnerabilities via GitHub Security or maintainers.

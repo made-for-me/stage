@@ -3,6 +3,7 @@ dist/
 coverage/
 *.log
 .DS_Store
+*:Zone.Identifier
 .env
 .env.*
 !.env.example

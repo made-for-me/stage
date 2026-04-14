@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "screen-map.v1",
+  "app": {
+    "name": "stage-demo",
+    "slug": "stage-demo",
+    "framework": "expo-router",
+    "entryRoute": "/(tabs)/home",
+    "buildId": "preview-2026-04-14"
+  },
+  "platform": {
+    "name": "ios",
+    "deviceType": "iPhone 15 Pro",
+    "viewport": {
+      "width": 393,
+      "height": 852
+    },
+    "safeArea": {
+      "top": 59,
+      "bottom": 34
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Home",
+      "route": "/(tabs)/home",
+      "status": "supported",
+      "screenshot": "./screens/home.json",
+      "notes": "Landing view with the primary CTA and bottom tabs."
+    },
+    {
+      "id": "settings",
+      "title": "Settings",
+      "route": "/settings",
+      "status": "partial",
+      "screenshot": "./screens/settings.json",
+      "notes": "Settings entry point with one platform-specific branch still shimmed."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "home",
+      "event": "tap:Settings",
+      "to": "settings",
+      "evidence": ["./screens/home.json", "./screens/settings.json"]
+    }
+  ],
+  "journeys": [
+    {
+      "id": "home-to-settings",
+      "title": "Home to settings",
+      "steps": [
+        "Open the home route",
+        "Tap the Settings entry",
+        "Confirm the settings route loads"
+      ],
+      "assertions": [
+        "Settings screen renders within the iPhone frame",
+        "No unsupported module warnings block the page"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "native-module-shimmed",
+      "message": "expo-haptics is mapped to a no-op shim in browser preview.",
+      "file": "app/_layout.tsx"
+    }
+  ]
+}

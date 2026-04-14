@@ -1,0 +1,29 @@
+{
+  "previewMode": "ios-preview",
+  "routes": {
+    "app/index.tsx": {
+      "title": "Home",
+      "variants": {
+        "default": {
+          "title": "Logged out",
+          "params": {
+            "user": "guest"
+          },
+          "mockData": {
+            "headline": "Build mobile UI on Windows with confidence."
+          }
+        },
+        "review": {
+          "title": "PR review",
+          "params": {
+            "user": "reviewer"
+          },
+          "mockData": {
+            "headline": "Visual review preset enabled."
+          },
+          "notes": "Used for screenshot and PR review flows."
+        }
+      }
+    }
+  }
+}

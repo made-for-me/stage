@@ -6,15 +6,18 @@
 
 Deliverables:
 
-- [ ] Resolve a local entry (adapter stub → real resolution).
-- [ ] Bundle or load path that produces one screen in the iframe (not just placeholder HTML).
-- [ ] `pnpm dev` remains the single entry for contributors.
+- [x] Resolve a local Expo route into a preview target.
+- [x] Generate a preview manifest with local files, shims, diagnostics, and `ScreenMapV1`.
+- [x] Bundle and mount one real route in the iframe.
+- [x] Keep `pnpm dev` as the single contributor entrypoint.
 
 ## Next
 
-- Smarter dependency / import graph for preview slices.
-- Adapters for Expo and bare React Native layouts.
-- Optional shareable preview URLs (out of scope until local loop is solid).
+- Route selection UX beyond query-string driven `screen` and `variant`.
+- Richer screen-map export with screenshots and journeys.
+- Expand the compatibility registry and add fixture-driven validation presets.
+- Split `auxiliary/stage-runner` and `auxiliary/stage-devtools` into standalone repositories.
+- Add remote session execution once the local loop remains stable.
 
 ## Principles
 

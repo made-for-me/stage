@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stage DevTools Viewer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0d14;
+        --panel: #111827;
+        --panel-2: #0f172a;
+        --border: #243041;
+        --text: #e5eefb;
+        --muted: #9fb0c8;
+        --accent: #7dd3fc;
+        --warning: #fbbf24;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(125, 211, 252, 0.12), transparent 40%),
+          linear-gradient(180deg, #05070c 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr) 320px;
+        min-height: 100vh;
+      }
+
+      .pane {
+        padding: 20px;
+        border-right: 1px solid var(--border);
+      }
+
+      .pane:last-child {
+        border-right: 0;
+      }
+
+      .title {
+        margin: 0 0 8px;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+
+      .subtle {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .card {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.8);
+        padding: 14px;
+      }
+
+      .catalog button {
+        width: 100%;
+        display: block;
+        margin: 0 0 8px;
+        padding: 12px 14px;
+        text-align: left;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #0b1120;
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .catalog button[aria-pressed="true"] {
+        border-color: rgba(125, 211, 252, 0.65);
+        box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.2) inset;
+      }
+
+      .preview {
+        min-height: 560px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background:
+          linear-gradient(180deg, rgba(148, 163, 184, 0.08), transparent 20%),
+          #050814;
+        padding: 16px;
+      }
+
+      .frame {
+        aspect-ratio: 393 / 852;
+        width: min(100%, 420px);
+        margin: 0 auto;
+        border-radius: 36px;
+        border: 1px solid rgba(125, 211, 252, 0.3);
+        background: #ffffff;
+        overflow: hidden;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+      }
+
+      .frame iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #fff;
+      }
+
+      .meta {
+        display: grid;
+        gap: 12px;
+      }
+
+      .label {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+
+      .value {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .warning {
+        color: var(--warning);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        color: #dbeafe;
+      }
+
+      @media (max-width: 1100px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .pane {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="pane">
+        <h1 class="title">Stage DevTools</h1>
+        <p class="subtle">
+          Minimal static viewer for browser-first Expo validation. This shell is meant to consume
+          the versioned JSON contract, not a custom backend.
+        </p>
+        <div class="card catalog" id="catalog"></div>
+      </section>
+
+      <section class="pane">
+        <div class="preview">
+          <div class="frame">
+            <iframe id="frame" title="preview" src="about:blank"></iframe>
+          </div>
+        </div>
+        <div class="card" id="screen-details"></div>
+      </section>
+
+      <section class="pane">
+        <div class="meta" id="session-details"></div>
+        <div class="card" id="diagnostics"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      const state = {
+        activeScreenId: null,
+      };
+
+      const screenMap = await fetch("../sample-data/screen-map.v1.json").then((res) => res.json());
+      const sessionRef = await fetch("../sample-data/session-ref.v1.json").then((res) => res.json());
+
+      const catalog = document.querySelector("#catalog");
+      const screenDetails = document.querySelector("#screen-details");
+      const sessionDetails = document.querySelector("#session-details");
+      const diagnostics = document.querySelector("#diagnostics");
+      const frame = document.querySelector("#frame");
+
+      function renderCatalog() {
+        catalog.innerHTML = `
+          <div class="subtle">Route catalog</div>
+          <div style="margin-top: 12px;"></div>
+          ${screenMap.screens
+            .map(
+              (screen) => `
+                <button data-screen="${screen.id}" aria-pressed="${screen.id === state.activeScreenId}">
+                  <strong>${screen.title}</strong><br />
+                  <span class="subtle">${screen.route} · ${screen.status}</span>
+                </button>
+              `,
+            )
+            .join("")}
+        `;
+
+        catalog.querySelectorAll("button[data-screen]").forEach((button) => {
+          button.addEventListener("click", () => setActiveScreen(button.dataset.screen));
+        });
+      }
+
+      function setActiveScreen(screenId) {
+        state.activeScreenId = screenId;
+        const screen = screenMap.screens.find((item) => item.id === screenId);
+        const screenMeta = screenMap.app;
+
+        frame.srcdoc = `
+          <!doctype html>
+          <html>
+            <body style="margin:0;display:grid;place-items:center;height:100vh;font-family:system-ui;background:#fff;color:#111827;">
+              <div style="text-align:center;padding:24px;">
+                <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Static preview shell</div>
+                <div style="font-size:28px;font-weight:700;">${screen.title}</div>
+                <div style="margin-top:10px;font-size:14px;color:#374151;">${screen.route}</div>
+              </div>
+            </body>
+          </html>
+        `;
+
+        screenDetails.innerHTML = `
+          <div class="label">Selected screen</div>
+          <div class="value">
+            <strong>${screen.title}</strong><br />
+            Route: <code>${screen.route}</code><br />
+            Status: <code>${screen.status}</code><br />
+            Notes: ${screen.notes}
+          </div>
+          <div style="margin-top: 12px;" class="subtle">
+            App: ${screenMeta.name} · Framework: ${screenMeta.framework} · Entry: ${screenMeta.entryRoute}
+          </div>
+        `;
+
+        renderCatalog();
+      }
+
+      function renderSession() {
+        sessionDetails.innerHTML = `
+          <div class="card">
+            <span class="label">Session</span>
+            <div class="value">
+              <strong>${sessionRef.id}</strong><br />
+              Platform: <code>${sessionRef.platform}</code><br />
+              Device: <code>${sessionRef.deviceType}</code><br />
+              Status: <code>${sessionRef.status}</code>
+            </div>
+          </div>
+          <div class="card">
+            <span class="label">Evidence links</span>
+            <div class="value">
+              Stream: <code>${sessionRef.streamUrl}</code><br />
+              Control: <code>${sessionRef.controlUrl}</code><br />
+              Recording: <code>${sessionRef.recordingUrl}</code>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderDiagnostics() {
+        diagnostics.innerHTML = `
+          <span class="label">Diagnostics</span>
+          <div class="value">
+            ${screenMap.diagnostics
+              .map(
+                (item) => `
+                  <div style="margin-top: 10px;">
+                    <strong class="${item.level === "warning" ? "warning" : ""}">${item.level.toUpperCase()}</strong>
+                    <span class="subtle"> ${item.code}</span><br />
+                    ${item.message}<br />
+                    <span class="subtle">${item.file ?? ""}</span>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+        `;
+      }
+
+      renderSession();
+      renderDiagnostics();
+      setActiveScreen(screenMap.screens[0].id);
+    </script>
+  </body>
+</html>

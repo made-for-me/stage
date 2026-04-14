@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "session-ref.v1",
+  "id": "session_01HTSTAGEDEMO",
+  "platform": "ios",
+  "deviceType": "iPhone 15 Pro",
+  "status": "running",
+  "buildId": "build_01HTSTAGEDEMO",
+  "previewRoute": "/(tabs)/home",
+  "streamUrl": "https://stage.local/sessions/session_01HTSTAGEDEMO/stream",
+  "controlUrl": "wss://stage.local/sessions/session_01HTSTAGEDEMO/control",
+  "recordingUrl": "https://stage.local/sessions/session_01HTSTAGEDEMO/recording.mp4",
+  "startedAt": "2026-04-14T12:00:00.000Z"
+}

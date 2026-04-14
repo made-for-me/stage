@@ -1,0 +1,400 @@
+openapi: 3.1.0
+info:
+  title: stage-runner
+  version: 0.1.0
+  description: Self-hosted remote execution service for Stage sessions.
+servers:
+  - url: http://localhost:7780
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+  /builds:
+    post:
+      summary: Register a build artifact
+      operationId: createBuild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildCreateRequest"
+      responses:
+        "201":
+          description: Build created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildRef"
+  /sessions:
+    post:
+      summary: Start a remote session
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCreateRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRef"
+  /sessions/{sessionId}:
+    get:
+      summary: Fetch session metadata
+      operationId: getSession
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRef"
+  /sessions/{sessionId}/stream:
+    get:
+      summary: Fetch stream metadata for the browser viewer
+      operationId: getSessionStream
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stream descriptor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamRef"
+  /sessions/{sessionId}/control:
+    get:
+      summary: Upgrade to the low-latency control websocket
+      description: |
+        The control channel is websocket-based. It carries subscribe, action,
+        screenshot, state, log, ack, error, ping, and pong messages.
+      operationId: openSessionControl
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: Switching Protocols
+  /sessions/{sessionId}/actions:
+    post:
+      summary: Send one or more action commands to the active session
+      operationId: postSessionActions
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionBatchRequest"
+      responses:
+        "202":
+          description: Action batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionBatchResponse"
+components:
+  schemas:
+    BuildCreateRequest:
+      type: object
+      required:
+        - platform
+        - kind
+        - source
+      properties:
+        platform:
+          $ref: "#/components/schemas/Platform"
+        kind:
+          $ref: "#/components/schemas/BuildKind"
+        source:
+          $ref: "#/components/schemas/BuildSource"
+    BuildRef:
+      type: object
+      required:
+        - id
+        - platform
+        - kind
+        - source
+      properties:
+        id:
+          type: string
+        platform:
+          $ref: "#/components/schemas/Platform"
+        kind:
+          $ref: "#/components/schemas/BuildKind"
+        source:
+          $ref: "#/components/schemas/BuildSource"
+        status:
+          type: string
+          enum: [queued, uploading, ready, failed, expired]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    BuildKind:
+      type: string
+      enum: [ios-simulator-app, android-emulator-apk, android-emulator-aab]
+    BuildSource:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [upload, url, git]
+        uri:
+          type: string
+        checksum:
+          type: string
+        git:
+          type: object
+          additionalProperties: false
+          properties:
+            repo:
+              type: string
+            commitSha:
+              type: string
+            path:
+              type: string
+    SessionCreateRequest:
+      type: object
+      required:
+        - buildId
+        - platform
+      properties:
+        buildId:
+          type: string
+        platform:
+          $ref: "#/components/schemas/Platform"
+        deviceType:
+          $ref: "#/components/schemas/DeviceType"
+        viewport:
+          $ref: "#/components/schemas/Viewport"
+        ttlSeconds:
+          type: integer
+          minimum: 60
+    SessionRef:
+      type: object
+      required:
+        - id
+        - buildId
+        - platform
+        - deviceType
+        - status
+        - streamUrl
+        - controlUrl
+      properties:
+        id:
+          type: string
+        buildId:
+          type: string
+        platform:
+          $ref: "#/components/schemas/Platform"
+        deviceType:
+          $ref: "#/components/schemas/DeviceType"
+        status:
+          type: string
+          enum: [queued, provisioning, booting, installing, ready, streaming, busy, stopped, failed, expired]
+        streamUrl:
+          type: string
+          format: uri
+        controlUrl:
+          type: string
+          format: uri
+        startedAt:
+          type: string
+          format: date-time
+        lastHeartbeatAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: string
+        capabilities:
+          $ref: "#/components/schemas/SessionCapabilities"
+    SessionCapabilities:
+      type: object
+      properties:
+        touch:
+          type: boolean
+        keyboard:
+          type: boolean
+        screenshot:
+          type: boolean
+        clipboard:
+          type: boolean
+        rotation:
+          type: boolean
+    StreamRef:
+      type: object
+      required:
+        - sessionId
+        - transport
+        - signalingUrl
+      properties:
+        sessionId:
+          type: string
+        transport:
+          type: string
+          enum: [webrtc]
+        viewerToken:
+          type: string
+        signalingUrl:
+          type: string
+          format: uri
+        iceServers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IceServer"
+        media:
+          type: string
+          enum: [video-only]
+    IceServer:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        username:
+          type: string
+        credential:
+          type: string
+    ActionBatchRequest:
+      type: object
+      required:
+        - commands
+      properties:
+        commands:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ActionCommand"
+    ActionBatchResponse:
+      type: object
+      required:
+        - accepted
+      properties:
+        accepted:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionReceipt"
+    ActionReceipt:
+      type: object
+      required:
+        - command
+        - status
+      properties:
+        command:
+          $ref: "#/components/schemas/ActionCommand"
+        status:
+          type: string
+          enum: [accepted, rejected, queued, applied]
+        message:
+          type: string
+    ActionCommand:
+      type: object
+      required:
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [tap, doubleTap, longPress, swipe, drag, type, key, home, back, launch, screenshot, rotate, wait]
+        target:
+          $ref: "#/components/schemas/ActionTarget"
+        coordinates:
+          $ref: "#/components/schemas/Coordinates"
+        from:
+          $ref: "#/components/schemas/Coordinates"
+        to:
+          $ref: "#/components/schemas/Coordinates"
+        text:
+          type: string
+        key:
+          type: string
+        durationMs:
+          type: integer
+          minimum: 0
+        direction:
+          type: string
+          enum: [up, down, left, right]
+        bundleId:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
+    ActionTarget:
+      type: object
+      properties:
+        label:
+          type: string
+        accessibilityId:
+          type: string
+        testId:
+          type: string
+        role:
+          type: string
+    Coordinates:
+      type: object
+      required:
+        - x
+        - y
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+    Platform:
+      type: string
+      enum: [ios, android]
+    DeviceType:
+      type: string
+      enum: [ios-simulator, android-emulator]
+    Viewport:
+      type: object
+      properties:
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        scale:
+          type: number
+          minimum: 0.1

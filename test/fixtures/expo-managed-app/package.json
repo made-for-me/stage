@@ -1,0 +1,14 @@
+{
+  "name": "fixture-expo-stage-preview",
+  "private": true,
+  "type": "module",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "expo": "~54.0.0",
+    "expo-haptics": "~15.0.0",
+    "expo-router": "~6.0.0",
+    "expo-splash-screen": "~31.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.0"
+  }
+}

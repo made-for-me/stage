@@ -1,0 +1,11 @@
+{
+  "screenId": "settings",
+  "title": "Settings",
+  "screenshot": "./settings.png",
+  "capturedAt": "2026-04-14T12:00:00.000Z",
+  "viewport": {
+    "width": 393,
+    "height": 852
+  },
+  "notes": "Baseline settings screenshot with a partially shimmed native branch."
+}

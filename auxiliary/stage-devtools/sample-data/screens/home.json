@@ -1,0 +1,11 @@
+{
+  "screenId": "home",
+  "title": "Home",
+  "screenshot": "./home.png",
+  "capturedAt": "2026-04-14T12:00:00.000Z",
+  "viewport": {
+    "width": 393,
+    "height": 852
+  },
+  "notes": "Baseline home screenshot for browser-first preview."
+}

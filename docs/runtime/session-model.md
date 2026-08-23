@@ -13,7 +13,7 @@ A `StageSessionRef` is the stable browser contract for a running preview.
   "port": 8081,
   "worktreeRoot": "/workspace/.stage-worktrees/clubhall/ar2-arena-ui-sdk57-e69f",
   "previewUrl": "http://127.0.0.1:8081",
-  "devClientUrl": "exp+clubhall://expo-development-client/?url=...",
+  "devClientUrl": "clubhall://expo-development-client/?url=...",
   "sdkVersion": "57.0.11",
   "runtimeFingerprint": "9cdb24b84fd1",
   "compatibility": "compatible"

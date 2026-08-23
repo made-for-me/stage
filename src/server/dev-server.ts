@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { type Server, createServer } from "node:http";
+import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -8,8 +8,11 @@ import {
   type CreateLocalPreviewTargetOptions,
   createLocalPreviewTarget,
 } from "../adapters/local.js";
+import { loadStageConfig } from "../control/config.js";
+import { StageSessionManager } from "../control/session-manager.js";
 import { buildPreviewManifest } from "../core/pipeline.js";
-import { devFrameHtml, devShellHtml } from "./dev-html.js";
+import type { StageSessionTarget } from "../types/index.js";
+import { branchStudioHtml, devFrameHtml, devShellHtml } from "./dev-html.js";
 
 export type StageDevServerOptions = {
   cwd: string;
@@ -17,15 +20,23 @@ export type StageDevServerOptions = {
   route?: string;
   variant?: string;
   port: number;
+  configPath?: string;
 };
 
 export async function startStageDevServer(options: StageDevServerOptions): Promise<Server> {
   const browserAssets = await buildBrowserAssets();
+  const loadedConfig = await loadStageConfig(options.cwd, options.configPath);
+  const sessionManager = loadedConfig ? new StageSessionManager(loadedConfig.config) : null;
 
   const server = createServer(async (req, res) => {
     const requestUrl = new URL(req.url ?? "/", `http://127.0.0.1:${options.port}`);
 
     if (requestUrl.pathname === "/" || requestUrl.pathname === "/index.html") {
+      if (sessionManager) {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(branchStudioHtml());
+        return;
+      }
       const target = await createTargetFromRequest(options, requestUrl);
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(
@@ -35,6 +46,45 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
           targetLabel: target.label,
         }),
       );
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/stage" && req.method === "GET" && sessionManager) {
+      try {
+        sendJson(res, 200, await sessionManager.snapshot());
+      } catch (error) {
+        sendJson(res, 500, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/sessions" && req.method === "POST" && sessionManager) {
+      try {
+        const body = await readJsonBody(req);
+        const target: StageSessionTarget = body.target === "web" ? "web" : "dev-client";
+        const session = await sessionManager.startSession({
+          projectId: requiredString(body.projectId, "projectId"),
+          branch: requiredString(body.branch, "branch"),
+          target,
+        });
+        sendJson(res, 201, session);
+      } catch (error) {
+        sendJson(res, 400, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (
+      requestUrl.pathname.startsWith("/api/sessions/") &&
+      req.method === "DELETE" &&
+      sessionManager
+    ) {
+      try {
+        const sessionId = decodeURIComponent(requestUrl.pathname.slice("/api/sessions/".length));
+        sendJson(res, 200, sessionManager.stopSession(sessionId));
+      } catch (error) {
+        sendJson(res, 404, { error: errorMessage(error) });
+      }
       return;
     }
 
@@ -96,7 +146,7 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
 
     if (requestUrl.pathname === "/health") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ok: true, mode: "preview" }));
+      res.end(JSON.stringify({ ok: true, mode: sessionManager ? "branch-studio" : "preview" }));
       return;
     }
 
@@ -108,7 +158,36 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
     server.listen(options.port, resolve);
   });
 
+  server.on("close", () => sessionManager?.stopAll());
+
   return server;
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (chunks.reduce((total, value) => total + value.length, 0) > 64 * 1024) {
+      throw new Error("Request body is too large.");
+    }
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as Record<string, unknown>;
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${field} is required.`);
+  }
+  return value;
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(body, null, 2));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function createTargetFromRequest(options: StageDevServerOptions, requestUrl: URL) {

@@ -44,6 +44,9 @@ export async function loadStageConfig(
       workspaceRoot: config.workspaceRoot
         ? path.resolve(configRoot, config.workspaceRoot)
         : path.resolve(configRoot, ".stage-worktrees"),
+      sceneRoot: config.sceneRoot
+        ? path.resolve(configRoot, config.sceneRoot)
+        : path.resolve(configRoot, ".stage-scenes"),
       projects: config.projects.map((project) => ({
         ...project,
         localRoot: path.resolve(configRoot, project.localRoot),

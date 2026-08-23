@@ -74,6 +74,62 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
       return;
     }
 
+    if (requestUrl.pathname === "/api/scenes" && req.method === "POST" && sessionManager) {
+      try {
+        const body = await readJsonBody(req, 12 * 1024 * 1024);
+        const projectId = requiredString(body.projectId, "projectId");
+        const branchName = requiredString(body.branch, "branch");
+        const snapshot = await sessionManager.snapshot();
+        const branch = snapshot.branches.find(
+          (candidate) => candidate.projectId === projectId && candidate.name === branchName,
+        );
+        if (!branch?.sha) {
+          throw new Error(`Branch ${branchName} is not available for scene capture.`);
+        }
+        const requestedSha = optionalString(body.sha);
+        if (requestedSha && requestedSha !== branch.sha) {
+          throw new Error(
+            `Scene SHA ${requestedSha} is stale; ${branchName} is currently ${branch.sha}.`,
+          );
+        }
+        const scene = await sessionManager.scenes.save({
+          projectId,
+          branch: branchName,
+          sha: branch.sha,
+          title: requiredString(body.title, "title"),
+          route: requiredString(body.route, "route"),
+          imageDataUrl: requiredString(body.imageDataUrl, "imageDataUrl"),
+          width: optionalPositiveInteger(body.width),
+          height: optionalPositiveInteger(body.height),
+        });
+        sendJson(res, 201, scene);
+      } catch (error) {
+        sendJson(res, 400, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (
+      requestUrl.pathname.startsWith("/api/scenes/") &&
+      requestUrl.pathname.endsWith("/image") &&
+      req.method === "GET" &&
+      sessionManager
+    ) {
+      const encodedId = requestUrl.pathname.slice("/api/scenes/".length, -"/image".length);
+      const image = await sessionManager.scenes.readImage(decodeURIComponent(encodedId));
+      if (!image) {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        res.end("Scene not found");
+        return;
+      }
+      res.writeHead(200, {
+        "content-type": image.mimeType,
+        "cache-control": "private, max-age=31536000, immutable",
+      });
+      res.end(image.content);
+      return;
+    }
+
     if (
       requestUrl.pathname.startsWith("/api/sessions/") &&
       req.method === "DELETE" &&
@@ -163,15 +219,29 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
   return server;
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJsonBody(
+  req: IncomingMessage,
+  maxBytes = 64 * 1024,
+): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
+  let byteLength = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    if (chunks.reduce((total, value) => total + value.length, 0) > 64 * 1024) {
+    const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    chunks.push(value);
+    byteLength += value.length;
+    if (byteLength > maxBytes) {
       throw new Error("Request body is too large.");
     }
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as Record<string, unknown>;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalPositiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 function requiredString(value: unknown, field: string): string {

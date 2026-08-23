@@ -23,3 +23,14 @@ A `StageSessionRef` is the stable browser contract for a running preview.
 Lifecycle: `preparing` → `starting` → `live` → `stopped`, with `failed` available from any active state.
 
 Stage retains worktrees after stop so dependency links and Metro caches can be reused. A session never mutates the branch ref: worktrees are detached at the selected ref.
+
+## Scene model
+
+AR2 publishes each captured screen to `POST /api/scenes` with the project, branch, current SHA,
+route, title, dimensions, and a base64 PNG, JPEG, or WebP data URL. Stage rejects stale SHAs and stores
+one current image per branch + commit + route. `GET /api/stage` returns only scenes matching each
+branch's current SHA, so a new commit immediately presents an empty capture queue until AR2 refreshes
+the configured routes.
+
+The image bytes are served from `/api/scenes/:id/image`. Historical commit assets remain on disk for
+future visual diffs but do not appear in the current branch shelf.

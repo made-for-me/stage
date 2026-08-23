@@ -134,6 +134,9 @@ function configuredBranches(project: StageProjectConfig): string[] {
 }
 
 function normalizeBranchName(name: string): string {
+  if (name === "origin" || name === "origin/HEAD") {
+    return "";
+  }
   return name.startsWith("origin/") ? name.slice("origin/".length) : name;
 }
 

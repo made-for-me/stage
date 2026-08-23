@@ -2,11 +2,13 @@
 
 Branch Studio removes the merge-to-preview loop from Expo UI development.
 
-The opening screen is a collection of branches for one configured project. Each branch exposes its SDK, commit, Stage runtime fingerprint, availability, compatibility, and active sessions. `Open` launches the branch in the shared development client. `Compare` starts an embeddable web session and pins it to one of two comparison slots. `Stop` ends the owned Metro process without deleting the cached worktree.
+The opening screen is a visual library of branches for one configured project. Each branch is a shelf of screenshots captured from the current commit, with its SHA, compatibility, session state, and refresh time kept close to the imagery. Selecting a shelf adds it to the two-up comparison stage. The AR2 command surface opens the shared development client, starts live web comparisons, and requests fresh captures without exposing a traditional operator dashboard.
 
 ## Experience principles
 
 - Branch identity is always visible.
+- Screens, not status chrome, are the primary branch content.
+- Screenshots are scoped to branch, commit, and route; stale commits never appear as current scenes.
 - Comparison is a primary workflow, not a settings feature.
 - Stage Tester is the default ClubHall preview identity.
 - Runtime incompatibility is explicit and blocks unsafe assumptions.
@@ -22,10 +24,11 @@ The opening screen is a collection of branches for one configured project. Each 
 - Two-up web comparison workspace.
 - Session lifecycle, logs, status polling, and stop control.
 - SDK and Stage runtime-fingerprint preflight.
+- Persistent per-commit scene manifests and a local AR2 screenshot ingestion API.
 
 ## Later surface
 
 - `stage-runner` simulator workers and WebRTC streams.
-- Screenshot capture and visual diffs per commit.
+- Automated scene navigation, screenshot capture, and visual diffs per commit.
 - EAS Update snapshots for remote review.
 - More than two synchronized comparison slots.

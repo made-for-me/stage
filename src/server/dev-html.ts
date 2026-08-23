@@ -1,7 +1,8 @@
 import { previewFrameDocument } from "../preview/frame.js";
 import { STAGE_VERSION } from "../version.js";
+import { branchStudioDocument } from "./branch-studio-html.js";
 
-export function branchStudioHtml(): string {
+export function branchStudioHtmlLegacy(): string {
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -191,6 +192,10 @@ export function branchStudioHtml(): string {
     </script>
   </body>
 </html>`;
+}
+
+export function branchStudioHtml(): string {
+  return branchStudioDocument();
 }
 
 export function devShellHtml(options: {

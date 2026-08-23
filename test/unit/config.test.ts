@@ -16,5 +16,6 @@ describe("Stage config", () => {
     expect(loaded?.config.projects[0]?.id).toBe("app");
     expect(loaded?.config.projects[0]?.localRoot).toBe(path.resolve(root, "../app"));
     expect(loaded?.config.workspaceRoot).toBe(path.resolve(root, ".stage-worktrees"));
+    expect(loaded?.config.sceneRoot).toBe(path.resolve(root, ".stage-scenes"));
   });
 });

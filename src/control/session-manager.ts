@@ -5,25 +5,30 @@ import type {
   StageBranchRef,
   StageConfig,
   StageProjectConfig,
+  StageSceneRef,
   StageSessionRef,
   StageSessionTarget,
 } from "../types/index.js";
 import { ensureWorktree, listProjectBranches } from "./git.js";
+import { StageSceneStore } from "./scene-store.js";
 
 type ManagedSession = StageSessionRef & { process?: ChildProcess };
 
 export class StageSessionManager {
   readonly #config: StageConfig;
   readonly #sessions = new Map<string, ManagedSession>();
+  readonly scenes: StageSceneStore;
 
   constructor(config: StageConfig) {
     this.#config = config;
+    this.scenes = new StageSceneStore(config.sceneRoot ?? path.resolve(".stage-scenes"));
   }
 
   async snapshot(): Promise<{
     projects: StageProjectConfig[];
     branches: StageBranchRef[];
     sessions: StageSessionRef[];
+    scenes: StageSceneRef[];
   }> {
     const branches = (
       await Promise.all(this.#config.projects.map((project) => listProjectBranches(project)))
@@ -32,6 +37,19 @@ export class StageSessionManager {
       projects: this.#config.projects,
       branches,
       sessions: this.listSessions(),
+      scenes: (
+        await Promise.all(
+          branches
+            .filter((branch) => branch.sha)
+            .map((branch) =>
+              this.scenes.list({
+                projectId: branch.projectId,
+                branch: branch.name,
+                sha: branch.sha ?? undefined,
+              }),
+            ),
+        )
+      ).flat(),
     };
   }
 

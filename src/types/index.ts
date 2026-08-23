@@ -25,12 +25,30 @@ export type StageProjectConfig = {
     mode: string;
     scenario: string;
     route: string;
+    scenes?: Array<{
+      title: string;
+      route: string;
+    }>;
   };
 };
 
 export type StageConfig = {
   workspaceRoot?: string;
+  sceneRoot?: string;
   projects: StageProjectConfig[];
+};
+
+export type StageSceneRef = {
+  id: string;
+  projectId: string;
+  branch: string;
+  sha: string;
+  title: string;
+  route: string;
+  capturedAt: string;
+  width?: number;
+  height?: number;
+  imageUrl: string;
 };
 
 export type StageBranchRef = {

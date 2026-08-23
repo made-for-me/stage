@@ -11,7 +11,7 @@ const config: StageConfig = {
       appRoot: "apps/mobile",
       baselineBranch: "ar2/arena-ui-sdk57-e69f",
       trackedBranches: ["main", "codex/flighty-native-design-lab", "codex/world-first-clubhall-ui"],
-      scheme: "exp+clubhall",
+      scheme: "clubhall",
       host: process.env.STAGE_METRO_HOST ?? "127.0.0.1",
       startingPort: 8081,
       prepareCommand: ["pnpm", "install", "--prefer-offline", "--frozen-lockfile"],

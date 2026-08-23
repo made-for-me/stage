@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { renderPreviewState } from "../../src/preview/frame.js";
-import { devFrameHtml, devShellHtml } from "../../src/server/dev-html.js";
+import { branchStudioHtml, devFrameHtml, devShellHtml } from "../../src/server/dev-html.js";
 
 describe("dev HTML", () => {
+  it("renders the Branch Studio control plane", () => {
+    const html = branchStudioHtml();
+
+    expect(html).toContain("STAGE");
+    expect(html).toContain("Scenes refresh per commit");
+    expect(html).toContain("Ask AR2 to open, compare, or refresh a branch");
+    expect(html).toContain('class="scene-strip"');
+    expect(html).not.toContain("Branches</button>");
+    expect(html).not.toContain("Sessions</button>");
+    expect(html).not.toContain("Settings</button>");
+    expect(html).toContain("/api/sessions");
+    expect(html).toContain("preview-grid");
+  });
   it("renders the shell with ios-preview language and fidelity notes", () => {
     const html = devShellHtml({
       frameSrc: "/preview/frame?screen=app/index",

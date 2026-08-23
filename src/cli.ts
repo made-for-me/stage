@@ -15,6 +15,7 @@ type CommandOptions = {
   route?: string;
   variant?: string;
   json: boolean;
+  configPath?: string;
 };
 
 export async function runStageCli(argv = process.argv.slice(2)): Promise<number> {
@@ -49,6 +50,7 @@ export async function runStageCli(argv = process.argv.slice(2)): Promise<number>
       route: options.route,
       variant: options.variant,
       port: options.port,
+      configPath: options.configPath,
     });
 
     process.stdout.write(`Stage dev server http://127.0.0.1:${options.port}\n`);
@@ -86,6 +88,7 @@ function parseArgs(argv: string[]): CommandOptions {
   let route: string | undefined;
   let variant: string | undefined;
   let json = false;
+  let configPath: string | undefined;
 
   for (let index = 1; index < argv.length; index += 1) {
     const current = argv[index];
@@ -117,6 +120,15 @@ function parseArgs(argv: string[]): CommandOptions {
       continue;
     }
 
+    if (current === "--config") {
+      const value = argv[index + 1];
+      if (value) {
+        configPath = value;
+        index += 1;
+      }
+      continue;
+    }
+
     if (current === "--screen" || current === "--route") {
       const value = argv[index + 1];
       if (value) {
@@ -141,6 +153,7 @@ function parseArgs(argv: string[]): CommandOptions {
     route,
     variant,
     json,
+    configPath,
   };
 }
 
@@ -206,6 +219,7 @@ function printHelp(): void {
 
 Options:
   --project-root <path>  Override the local project root
+  --config <path>        Load a branch-studio stage.config.ts/json
   --screen <route>       Preview a specific Expo route
   --variant <name>       Select a route variant from stage.preview.json
   --port <number>        Port for the Stage dev server (default: 3847)

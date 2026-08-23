@@ -1,6 +1,6 @@
 # Stage
 
-Browser-first preview infrastructure for Expo and React Native projects.
+Branch and session control infrastructure for Expo and React Native projects.
 
 ## Why
 
@@ -8,6 +8,10 @@ Testing mobile UI should not depend on owning a Mac, running a simulator locally
 
 ## What it does today
 
+- discovers configured Git branches and evaluates SDK/runtime compatibility
+- creates isolated cached worktrees and owns one Metro process per preview session
+- opens compatible branches in one Expo development client
+- compares two live Expo web sessions in the Branch Studio dashboard
 - resolves a local Expo Router project into a preview target
 - builds a browser VFS manifest with `browser-metro`
 - mounts one real route inside an isolated iOS-preview browser frame
@@ -24,7 +28,15 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://127.0.0.1:3847](http://127.0.0.1:3847). When you run `pnpm dev` inside this repo, Stage uses the built-in Expo fixture under `test/fixtures/expo-managed-app` so contributors get a reproducible preview immediately.
+Open [http://127.0.0.1:3847](http://127.0.0.1:3847). When `stage.config.ts` is present, Stage opens Branch Studio. Without a config it falls back to the built-in Expo fixture under `test/fixtures/expo-managed-app` so contributors still get a reproducible route preview.
+
+The bundled ClubHall pilot expects a local checkout:
+
+```bash
+STAGE_CLUBHALL_ROOT=/absolute/path/to/clubhall pnpm dev
+```
+
+`Open` starts a development-client session. `Compare` starts an Expo web session in one of two comparison slots. `Stop` ends the Metro process and retains the worktree cache.
 
 To preview a different project:
 
@@ -84,6 +96,11 @@ This is the basis for route isolation, screenshot review, and future PR validati
 
 - [Architecture](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
+- [Branch Studio](docs/product/branch-studio.md)
+- [Session model](docs/runtime/session-model.md)
+- [Native compatibility](docs/runtime/native-compatibility.md)
+- [Preview authentication](docs/runtime/preview-auth.md)
+- [ClubHall pilot](docs/pilot/clubhall.md)
 - [Auxiliary blueprints](auxiliary/README.md)
 - [Contributing](CONTRIBUTING.md)
 

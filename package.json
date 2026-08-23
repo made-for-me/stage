@@ -2,7 +2,7 @@
   "name": "stage",
   "version": "0.1.0",
   "private": false,
-  "description": "Browser-first app preview runtime for React Native and Expo projects.",
+  "description": "Branch, session, and visual preview control plane for React Native and Expo projects.",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.33.0",

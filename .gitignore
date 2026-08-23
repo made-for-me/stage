@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+.stage-scenes/
+.stage-worktrees/
 *.log
 .DS_Store
 *:Zone.Identifier

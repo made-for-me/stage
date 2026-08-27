@@ -128,7 +128,7 @@ function prepareMobileProject(mobileRoot, branchName, commitSha) {
   };
   writeFileSync(
     path.join(mobileRoot, "app.config.js"),
-    `module.exports = ${JSON.stringify({ expo: config }, null, 2)};\n`,
+    `module.exports = ${JSON.stringify(config, null, 2)};\n`,
   );
 }
 

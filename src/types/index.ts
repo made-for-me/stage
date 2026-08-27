@@ -15,6 +15,7 @@ export type StageProjectConfig = {
   appRoot: string;
   baselineBranch: string;
   trackedBranches?: string[];
+  discoverBranches?: boolean;
   host?: string;
   scheme?: string;
   startingPort?: number;
@@ -46,9 +47,24 @@ export type StageSceneRef = {
   title: string;
   route: string;
   capturedAt: string;
+  contentHash?: string;
   width?: number;
   height?: number;
   imageUrl: string;
+};
+
+export type StageCaptureStatus = "queued" | "capturing" | "completed" | "failed";
+
+export type StageCaptureRef = {
+  id: string;
+  projectId: string;
+  branch: string;
+  sha: string;
+  status: StageCaptureStatus;
+  requestedAt: string;
+  updatedAt: string;
+  requestedBy: "ar2" | "stage";
+  error?: string;
 };
 
 export type StageBranchRef = {

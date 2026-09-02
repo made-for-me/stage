@@ -3,12 +3,14 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type {
   StageBranchRef,
+  StageCaptureRef,
   StageConfig,
   StageProjectConfig,
   StageSceneRef,
   StageSessionRef,
   StageSessionTarget,
 } from "../types/index.js";
+import { StageCaptureStore } from "./capture-store.js";
 import { ensureWorktree, listProjectBranches } from "./git.js";
 import { StageSceneStore } from "./scene-store.js";
 
@@ -18,10 +20,12 @@ export class StageSessionManager {
   readonly #config: StageConfig;
   readonly #sessions = new Map<string, ManagedSession>();
   readonly scenes: StageSceneStore;
+  readonly captures: StageCaptureStore;
 
   constructor(config: StageConfig) {
     this.#config = config;
     this.scenes = new StageSceneStore(config.sceneRoot ?? path.resolve(".stage-scenes"));
+    this.captures = new StageCaptureStore(config.sceneRoot ?? path.resolve(".stage-scenes"));
   }
 
   async snapshot(): Promise<{
@@ -29,27 +33,45 @@ export class StageSessionManager {
     branches: StageBranchRef[];
     sessions: StageSessionRef[];
     scenes: StageSceneRef[];
+    captures: StageCaptureRef[];
   }> {
     const branches = (
       await Promise.all(this.#config.projects.map((project) => listProjectBranches(project)))
     ).flat();
+    const scenes = (
+      await Promise.all(
+        branches
+          .filter((branch) => branch.sha)
+          .map((branch) =>
+            this.scenes.list({
+              projectId: branch.projectId,
+              branch: branch.name,
+              sha: branch.sha ?? undefined,
+            }),
+          ),
+      )
+    ).flat();
+    const orderedScenes = this.#config.projects.flatMap((project) => {
+      const order = new Map(
+        (project.preview?.scenes ?? []).map((scene, index) => [scene.route, index]),
+      );
+      return scenes
+        .filter((scene) => scene.projectId === project.id)
+        .sort((left, right) => (order.get(left.route) ?? 999) - (order.get(right.route) ?? 999));
+    });
     return {
       projects: this.#config.projects,
       branches,
       sessions: this.listSessions(),
-      scenes: (
-        await Promise.all(
-          branches
-            .filter((branch) => branch.sha)
-            .map((branch) =>
-              this.scenes.list({
-                projectId: branch.projectId,
-                branch: branch.name,
-                sha: branch.sha ?? undefined,
-              }),
-            ),
-        )
-      ).flat(),
+      scenes: orderedScenes,
+      captures: (await this.captures.list()).filter((capture) =>
+        branches.some(
+          (branch) =>
+            branch.projectId === capture.projectId &&
+            branch.name === capture.branch &&
+            branch.sha === capture.sha,
+        ),
+      ),
     };
   }
 

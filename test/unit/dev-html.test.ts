@@ -7,14 +7,17 @@ describe("dev HTML", () => {
     const html = branchStudioHtml();
 
     expect(html).toContain("STAGE");
-    expect(html).toContain("Scenes refresh per commit");
-    expect(html).toContain("Ask AR2 to open, compare, or refresh a branch");
-    expect(html).toContain('class="scene-strip"');
+    expect(html).toContain("Visual history");
+    expect(html).toContain("See what each branch changed");
+    expect(html).toContain("Ask AR2 to capture a branch or compare two versions");
+    expect(html).toContain('class="screen-reel"');
     expect(html).not.toContain("Branches</button>");
     expect(html).not.toContain("Sessions</button>");
     expect(html).not.toContain("Settings</button>");
-    expect(html).toContain("/api/sessions");
-    expect(html).toContain("preview-grid");
+    expect(html).toContain("/api/captures");
+    expect(html).not.toContain("/api/sessions");
+    expect(html).not.toContain("preview-grid");
+    expect(html).not.toContain("iframe");
   });
   it("renders the shell with ios-preview language and fidelity notes", () => {
     const html = devShellHtml({

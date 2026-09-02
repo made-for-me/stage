@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+allowBuilds:
+  '@biomejs/biome': true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - expo-eas-client@57.0.2
+  - expo-updates@57.0.18

@@ -74,6 +74,7 @@ export class StageSceneStore {
       title: input.title,
       route: input.route,
       capturedAt,
+      contentHash: createHash("sha256").update(image).digest("hex").slice(0, 16),
       width: positiveInteger(input.width),
       height: positiveInteger(input.height),
       file,

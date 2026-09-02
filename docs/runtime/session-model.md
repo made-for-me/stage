@@ -34,3 +34,11 @@ the configured routes.
 
 The image bytes are served from `/api/scenes/:id/image`. Historical commit assets remain on disk for
 future visual diffs but do not appear in the current branch shelf.
+
+## Capture queue
+
+`POST /api/captures` creates an idempotent request for one exact project + branch + SHA. AR2 claims
+the oldest request through `GET /api/captures/next`, captures the configured routes, uploads them to
+`POST /api/scenes`, and may report failure through `PATCH /api/captures/:id`. Stage automatically
+marks a request completed when every configured scene exists for that SHA. Capture requests and
+status transitions survive a Stage restart.

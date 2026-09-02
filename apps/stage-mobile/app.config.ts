@@ -1,6 +1,6 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const projectId = process.env.STAGE_EAS_PROJECT_ID ?? "00000000-0000-4000-8000-000000000000";
+const projectId = process.env.STAGE_EAS_PROJECT_ID ?? "350f40bc-c260-4c04-a3b3-f86571fbbefd";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -46,11 +46,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ...(process.env.EXPO_PUBLIC_STAGE_API_URL
         ? { apiUrl: process.env.EXPO_PUBLIC_STAGE_API_URL }
         : {}),
-      baselineBranch: "ar2/arena-ui-sdk57-e69f",
+      baselineBranch: "recovery/canonical-mainline-20260902",
       trackedBranches: [
-        "ar2/arena-ui-sdk57-e69f",
-        "codex/flighty-native-design-lab",
-        "codex/world-first-clubhall-ui",
+        "recovery/canonical-mainline-20260902",
         "main",
       ],
     },

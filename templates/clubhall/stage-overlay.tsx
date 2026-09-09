@@ -79,8 +79,12 @@ export function StageOverlay({ children }: PropsWithChildren) {
 
   async function open(branch: Branch) {
     if (branch.compatibility === "incompatible" || opening) return;
-    const channel = branchChannel(branch.name);
-    setOpening(branch.name);
+    await openChannel(branchChannel(branch.name), branch.name);
+  }
+
+  async function openChannel(channel: string, label: string) {
+    if (opening) return;
+    setOpening(label);
     setError(null);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -159,6 +163,16 @@ export function StageOverlay({ children }: PropsWithChildren) {
                   <Text style={{ color: "#4B93FF", fontSize: 16 }}>Fechar</Text>
                 </Pressable>
               </View>
+              <Pressable
+                accessibilityLabel="Voltar ao shell Stage"
+                disabled={Boolean(opening)}
+                onPress={() => void openChannel("stage-shell", "stage-shell")}
+                style={{ paddingVertical: 12 }}
+              >
+                <Text style={{ color: "#4B93FF", fontSize: 16 }}>
+                  {opening === "stage-shell" ? "Abrindo Stage…" : "Voltar ao Stage"}
+                </Text>
+              </Pressable>
               {error ? (
                 <Text selectable style={{ color: "#FFB340", fontSize: 12 }}>
                   {error}

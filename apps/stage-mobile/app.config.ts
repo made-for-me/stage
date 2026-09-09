@@ -47,10 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         ? { apiUrl: process.env.EXPO_PUBLIC_STAGE_API_URL }
         : {}),
       baselineBranch: "recovery/canonical-mainline-20260902",
-      trackedBranches: [
-        "recovery/canonical-mainline-20260902",
-        "main",
-      ],
+      trackedBranches: ["recovery/canonical-mainline-20260902", "main"],
     },
   },
 });

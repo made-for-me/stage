@@ -23,7 +23,10 @@
     "mobile:start": "pnpm --dir apps/stage-mobile start",
     "mobile:typecheck": "pnpm --dir apps/stage-mobile typecheck",
     "mobile:testflight": "pnpm --dir apps/stage-mobile testflight",
-    "preview:clubhall": "node scripts/publish-clubhall-preview.mjs"
+    "preview:clubhall": "node scripts/publish-clubhall-preview.mjs",
+    "mobile:build": "pnpm --dir apps/stage-mobile build:testflight",
+    "mobile:submit": "pnpm --dir apps/stage-mobile submit:testflight",
+    "mobile:publish-shell": "pnpm --dir apps/stage-mobile publish:shell"
   },
   "keywords": ["expo", "react-native", "preview", "browser", "devtools"],
   "repository": {

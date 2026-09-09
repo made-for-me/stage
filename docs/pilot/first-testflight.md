@@ -91,3 +91,16 @@ PR automation and a hosted Stage catalog are not required for this first milesto
 - A missing update restores the previous channel and leaves the current screen usable.
 
 Do not label the build or OTA loop validated until these checks run on the installed iPhone build.
+
+## Authenticated EAS check — 2026-09-09
+
+- Robot authentication succeeded with Admin access to madeforme; no token is stored in this repository.
+- EAS project: @madeforme/stage-mobile, UUID 350f40bc-c260-4c04-a3b3-f86571fbbefd.
+- No iOS builds were present. A store build attempt stopped before upload at credential setup.
+- EAS incremented the remote iOS build number from 1 to 2 during that attempt.
+- An existing team distribution certificate is available (expires June 19, 2027), and an App Store Connect submission API key is already configured. Do not recreate either blindly.
+- Reusing the certificate reached “Creating provisioning profile” and required Apple Developer login. Interactive setup was stopped at the Apple ID prompt; the Stage provisioning profile remains the immediate blocker.
+- EAS reported no Plain text or Sensitive variables in Stage's preview environment; this does not establish whether Secret variables exist.
+- Candidate ClubHall commit: 53b15b3d30b0254f9401e487f9cdf5560a037ad2. Its Stage anonymous-auth guard accepts only development or native channel preview. The Stage shell uses stage-shell; this guard must be reconciled safely before claiming automatic preview login works.
+- ClubHall already has a Stage publication workflow pinned to c44a9cd, not the newer overlay-return commit. Update that pin when enabling the tested workflow.
+- The PR CI passed on d2531d9 (run 34324310940). Native signing, OTA publication and the iPhone acceptance loop are not yet complete.

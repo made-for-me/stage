@@ -1,8 +1,11 @@
 import * as Updates from "expo-updates";
+import { Platform } from "react-native";
 
 export async function switchPreview(channel: string, previousChannel: string): Promise<void> {
-  if (!Updates.isEnabled) {
-    throw new Error("A troca remota funciona no build do TestFlight, não dentro do Expo Go.");
+  if (Platform.OS === "web" || !Updates.isEnabled) {
+    throw new Error(
+      "A troca remota funciona no build do TestFlight, não no navegador ou no Expo Go.",
+    );
   }
 
   try {

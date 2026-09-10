@@ -1,4 +1,5 @@
-export const STAGE_SHELL_CHANNEL = "stage-shell";
+export const STAGE_SHELL_CHANNEL =
+  process.env.STAGE_SHELL_CHANNEL ?? process.env.STAGE_PREVIEW_CHANNEL ?? "preview";
 
 export function branchChannel(branch: string): string {
   const slug = branch

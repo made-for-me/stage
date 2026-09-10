@@ -10,6 +10,8 @@ const clubhallRoot = process.env.STAGE_CLUBHALL_ROOT;
 const branch = valueAfter("--branch") ?? process.env.STAGE_BRANCH;
 const requestedRef = valueAfter("--ref") ?? process.env.STAGE_REF ?? branch;
 const prepareOnly = process.argv.includes("--prepare-only");
+const shellChannel =
+  process.env.STAGE_SHELL_CHANNEL ?? process.env.STAGE_PREVIEW_CHANNEL ?? "preview";
 
 if (!clubhallRoot || !branch) {
   fail(
@@ -113,7 +115,7 @@ function prepareMobileProject(mobileRoot, branchName, commitSha) {
     runtimeVersion: "stage-clubhall-sdk57-v1",
     updates: {
       url: `https://u.expo.dev/${projectId}`,
-      requestHeaders: { "expo-channel-name": "stage-shell" },
+      requestHeaders: { "expo-channel-name": shellChannel },
     },
     ios: {
       ...original.ios,

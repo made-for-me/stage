@@ -3,7 +3,7 @@ import type { StageRuntimeConfig } from "./types";
 
 const fallback: StageRuntimeConfig = {
   projectId: "clubhall",
-  channel: "stage-shell",
+  channel: "preview",
   apiUrl: null,
   baselineBranch: "ar2/arena-ui-sdk57-e69f",
   trackedBranches: ["ar2/arena-ui-sdk57-e69f"],

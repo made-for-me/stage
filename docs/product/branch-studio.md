@@ -32,3 +32,9 @@ The opening screen is a visual history of branches for one configured project. E
 - Content-hash change labels and later pixel-level visual diffs per commit.
 - EAS Update snapshots for remote review.
 - More than two synchronized comparison slots.
+
+## Mobile supervisor prototype (September 2026)
+
+The mobile shell now starts with the Stage supervisor. Branch Studio remains the desktop visual
+preview surface and native branches remain accessible in **Laboratório → ClubHall nativo**.
+See [Supervisor](supervisor.md) for the mobile product contract and verification boundaries.

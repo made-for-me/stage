@@ -166,11 +166,11 @@ export function StageOverlay({ children }: PropsWithChildren) {
               <Pressable
                 accessibilityLabel="Voltar ao shell Stage"
                 disabled={Boolean(opening)}
-                onPress={() => void openChannel("stage-shell", "stage-shell")}
+                onPress={() => void openChannel(extra.channel, "stage-shell")}
                 style={{ paddingVertical: 12 }}
               >
                 <Text style={{ color: "#4B93FF", fontSize: 16 }}>
-                  {opening === "stage-shell" ? "Abrindo Stage…" : "Voltar ao Stage"}
+                  {opening === extra.channel ? "Abrindo Stage…" : "Voltar ao Stage"}
                 </Text>
               </Pressable>
               {error ? (

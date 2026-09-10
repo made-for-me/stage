@@ -6,7 +6,7 @@
   "build": {
     "testflight": {
       "distribution": "store",
-      "channel": "stage-shell",
+      "channel": "preview",
       "environment": "preview",
       "autoIncrement": true,
       "ios": {
@@ -16,7 +16,9 @@
   },
   "submit": {
     "testflight": {
-      "ios": {}
+      "ios": {
+        "ascAppId": "6810529779"
+      }
     }
   }
 }

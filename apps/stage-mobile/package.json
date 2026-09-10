@@ -10,7 +10,7 @@
     "testflight": "node ../../scripts/verify-stage-release.mjs && pnpm dlx eas-cli@latest build --platform ios --profile testflight --auto-submit-with-profile testflight",
     "build:testflight": "node ../../scripts/verify-stage-release.mjs && pnpm dlx eas-cli@latest build --platform ios --profile testflight",
     "submit:testflight": "pnpm dlx eas-cli@latest submit --platform ios --profile testflight",
-    "publish:shell": "node ../../scripts/verify-stage-release.mjs && pnpm dlx eas-cli@latest update --platform ios --channel stage-shell --environment preview"
+    "publish:shell": "node ../../scripts/verify-stage-release.mjs && pnpm dlx eas-cli@latest update --platform ios --channel preview --environment preview"
   },
   "dependencies": {
     "@better-auth/expo": "1.5.6",

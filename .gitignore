@@ -9,3 +9,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Expo local development state
+.expo/

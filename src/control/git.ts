@@ -14,17 +14,19 @@ export async function listProjectBranches(project: StageProjectConfig): Promise<
     );
   }
 
-  const discovered = await git(project.localRoot, [
-    "for-each-ref",
-    "--format=%(refname:short)",
-    "refs/heads",
-    "refs/remotes/origin",
-  ]);
   const names = new Set(configuredBranches(project));
-  for (const line of discovered.split("\n")) {
-    const name = normalizeBranchName(line.trim());
-    if (name && name !== "HEAD") {
-      names.add(name);
+  if (project.discoverBranches) {
+    const discovered = await git(project.localRoot, [
+      "for-each-ref",
+      "--format=%(refname:short)",
+      "refs/heads",
+      "refs/remotes/origin",
+    ]);
+    for (const line of discovered.split("\n")) {
+      const name = normalizeBranchName(line.trim());
+      if (name && name !== "HEAD") {
+        names.add(name);
+      }
     }
   }
 
@@ -49,11 +51,13 @@ export async function ensureWorktree(options: {
   destination: string;
 }): Promise<string> {
   const { project, branch, destination } = options;
+  const ref = await resolveRef(project.localRoot, branch);
+  const sha = (await git(project.localRoot, ["rev-parse", ref])).trim();
   if (existsSync(path.join(destination, ".git"))) {
+    await git(destination, ["reset", "--hard", sha]);
     return destination;
   }
-  const ref = await resolveRef(project.localRoot, branch);
-  await git(project.localRoot, ["worktree", "add", "--detach", destination, ref]);
+  await git(project.localRoot, ["worktree", "add", "--detach", destination, sha]);
   return destination;
 }
 

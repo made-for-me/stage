@@ -102,7 +102,85 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
           width: optionalPositiveInteger(body.width),
           height: optionalPositiveInteger(body.height),
         });
+        const project = snapshot.projects.find((candidate) => candidate.id === projectId);
+        const currentScenes = await sessionManager.scenes.list({
+          projectId,
+          branch: branchName,
+          sha: branch.sha,
+        });
+        const capture = (
+          await sessionManager.captures.list({
+            projectId,
+            branch: branchName,
+            sha: branch.sha,
+          })
+        )[0];
+        if (
+          capture &&
+          currentScenes.length >= (project?.preview?.scenes?.length ?? 1) &&
+          capture.status !== "completed"
+        ) {
+          await sessionManager.captures.update(capture.id, "completed");
+        }
         sendJson(res, 201, scene);
+      } catch (error) {
+        sendJson(res, 400, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/captures" && req.method === "POST" && sessionManager) {
+      try {
+        const body = await readJsonBody(req);
+        const projectId = requiredString(body.projectId, "projectId");
+        const branchName = requiredString(body.branch, "branch");
+        const snapshot = await sessionManager.snapshot();
+        const branch = snapshot.branches.find(
+          (candidate) => candidate.projectId === projectId && candidate.name === branchName,
+        );
+        if (!branch?.sha) throw new Error(`Branch ${branchName} is not available for capture.`);
+        const capture = await sessionManager.captures.request({
+          projectId,
+          branch: branchName,
+          sha: branch.sha,
+          requestedBy: body.requestedBy === "stage" ? "stage" : "ar2",
+        });
+        sendJson(res, 201, capture);
+      } catch (error) {
+        sendJson(res, 400, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/captures/next" && req.method === "GET" && sessionManager) {
+      try {
+        const projectId = optionalString(requestUrl.searchParams.get("projectId"));
+        const capture = await sessionManager.captures.next(projectId);
+        sendJson(res, 200, { capture });
+      } catch (error) {
+        sendJson(res, 400, { error: errorMessage(error) });
+      }
+      return;
+    }
+
+    if (
+      requestUrl.pathname.startsWith("/api/captures/") &&
+      req.method === "PATCH" &&
+      sessionManager
+    ) {
+      try {
+        const id = decodeURIComponent(requestUrl.pathname.slice("/api/captures/".length));
+        const body = await readJsonBody(req);
+        const status = requiredString(body.status, "status");
+        if (!(["queued", "capturing", "completed", "failed"] as string[]).includes(status)) {
+          throw new Error(`Unsupported capture status ${status}.`);
+        }
+        const capture = await sessionManager.captures.update(
+          id,
+          status as "queued" | "capturing" | "completed" | "failed",
+          optionalString(body.error),
+        );
+        sendJson(res, 200, capture);
       } catch (error) {
         sendJson(res, 400, { error: errorMessage(error) });
       }
@@ -147,6 +225,21 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
     if (requestUrl.pathname === "/preview/frame") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(devFrameHtml());
+      return;
+    }
+
+    if (requestUrl.pathname === "/assets/ar2-orb.png") {
+      try {
+        const content = await readFile(path.join(options.cwd, "assets", "ar2-orb.png"));
+        res.writeHead(200, {
+          "content-type": "image/png",
+          "cache-control": "public, max-age=3600",
+        });
+        res.end(content);
+      } catch {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        res.end("Asset not found");
+      }
       return;
     }
 
@@ -211,7 +304,7 @@ export async function startStageDevServer(options: StageDevServerOptions): Promi
   });
 
   await new Promise<void>((resolve) => {
-    server.listen(options.port, resolve);
+    server.listen(options.port, "0.0.0.0", resolve);
   });
 
   server.on("close", () => sessionManager?.stopAll());

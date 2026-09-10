@@ -15,11 +15,11 @@ Start Stage:
 STAGE_CLUBHALL_ROOT=/absolute/path/to/clubhall pnpm dev
 ```
 
-Open `http://127.0.0.1:3847`. `Compare` starts web sessions. `Open` starts a development-client session and deep-links the shared ClubHall development client.
+Open `http://127.0.0.1:3847`. Stage immediately shows the latest commit-pinned scene reel for each tracked branch. Select two branches and press `Compare` to align the same routes side by side. No browser simulator is embedded in this surface.
 
 The ClubHall scene plan currently asks AR2 to capture Home, Arena, Worlds, and Profile after each
 tracked branch changes. The Stage shelf displays only captures matching the branch's current commit.
-Use the AR2 command field for `compare`, `open`, and `refresh` requests; the human-facing navigation
-and settings sidebar has intentionally been removed.
+Use the AR2 command field for requests such as `capture arena`, `compare arena and flighty`, and
+`show changed screens`; the human-facing navigation, account, and settings surfaces have been removed.
 
 Before using a physical iPhone, set `STAGE_METRO_HOST` to the Mac's LAN hostname or IP. Keep `127.0.0.1` for local iOS Simulators.

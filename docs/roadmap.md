@@ -20,7 +20,7 @@ Deliverables:
 - [x] Render a branch collection with Open, Compare, and Stop controls.
 - [x] Compare two live web sessions.
 - [ ] Stream multiple native simulator sessions through `stage-runner`.
-- [ ] Publish and open EAS Update snapshots for remote review.
+- [x] Publish and open EAS Update snapshots in a TestFlight shell for remote review.
 - [ ] Capture screenshots and commit-level visual diffs.
 
 ## Next
@@ -30,6 +30,8 @@ Deliverables:
 - Expand the compatibility registry and add fixture-driven validation presets.
 - Split `auxiliary/stage-runner` and `auxiliary/stage-devtools` into standalone repositories.
 - Add remote session execution once the local loop remains stable.
+- Host the Stage branch catalog so the TestFlight shell discovers every new branch without an
+  embedded fallback list.
 
 ## Principles
 

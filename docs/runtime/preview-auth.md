@@ -1,6 +1,7 @@
 # Preview authentication
 
-Stage must remove manual signup without weakening ClubHall production auth.
+Stage itself has no signup or account. This document applies only when AR2 opens ClubHall to capture
+an authenticated in-app screen; it must remove manual signup without weakening ClubHall production auth.
 
 The ClubHall pilot uses Better Auth anonymous sessions on a dedicated preview Convex deployment. When `EXPO_PUBLIC_STAGE_MODE=stage`, the client silently signs in anonymously, bootstraps the normal ClubHall identity, seeds deterministic tennis fixtures, and enters the requested Stage route.
 

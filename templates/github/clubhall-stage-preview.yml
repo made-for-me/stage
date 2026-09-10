@@ -1,0 +1,62 @@
+name: Publish Stage preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: ClubHall branch to publish
+        required: true
+        type: string
+
+concurrency:
+  group: stage-preview-${{ github.event.pull_request.head.ref || inputs.branch }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      STAGE_EAS_PROJECT_ID: ${{ vars.STAGE_EAS_PROJECT_ID }}
+      STAGE_EXPO_OWNER: ${{ vars.STAGE_EXPO_OWNER }}
+      STAGE_IOS_BUNDLE_ID: ${{ vars.STAGE_IOS_BUNDLE_ID }}
+      EXPO_PUBLIC_STAGE_API_URL: ${{ vars.EXPO_PUBLIC_STAGE_API_URL }}
+      STAGE_BRANCH: ${{ github.event.pull_request.head.ref || inputs.branch }}
+      STAGE_REF: ${{ github.event.pull_request.head.sha || inputs.branch }}
+      STAGE_CLUBHALL_ROOT: ${{ github.workspace }}/clubhall
+    steps:
+      - name: Check out ClubHall preview source
+        uses: actions/checkout@v4
+        with:
+          path: clubhall
+          ref: ${{ env.STAGE_REF }}
+          fetch-depth: 0
+
+      - name: Check out Stage publisher
+        uses: actions/checkout@v4
+        with:
+          repository: made-for-me/stage
+          path: stage
+          ref: main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: clubhall/pnpm-lock.yaml
+
+      - name: Publish compatible branch to Stage
+        working-directory: stage
+        run: node scripts/publish-clubhall-preview.mjs --branch "$STAGE_BRANCH" --ref "$STAGE_REF"
+

@@ -1,5 +1,27 @@
 # First TestFlight: shell + one ClubHall OTA preview
 
+## Current release — September 10, 2026
+
+The earlier preparation notes below are historical. The current Stage store channel is `preview`,
+with runtime `stage-clubhall-sdk57-v1` and App Store Connect app ID `6810529779`.
+
+- Supervisor source pushed to `ar2/stage-testflight-branch-previews`, commit
+  `3d8830e4b44c847b69a9c5e2a9907a223d091baa`; GitHub CI passed.
+- iOS OTA update published to `preview`: group `6c0a20e1-7341-43a8-8b8b-27220fde8b70`,
+  update `01a08c18-988c-7bde-a6b1-060b330d4e25`. The public update endpoint returned this exact
+  update for the Stage iOS runtime and channel.
+- Native build **0.1.0 (7)** completed successfully:
+  https://expo.dev/accounts/madeforme/projects/stage-mobile/builds/e3ffdec6-0ad4-452f-8960-188ce54e1994
+- Automatic submission scheduled for that exact build:
+  https://expo.dev/accounts/madeforme/projects/stage-mobile/submissions/1b9c592b-6760-417b-9a57-00803daa74cc
+  Last checked at 16:21 UTC: `IN_QUEUE`. This is not confirmation of Apple processing or tester availability.
+- Existing compatible installs can receive the supervisor OTA after a cold launch and download;
+  another launch may be needed to apply it. Actual iPhone receipt and the ClubHall round-trip still
+  require on-device verification.
+
+Run release commands from `apps/stage-mobile`. The untracked root `app.json` points to a different
+EAS project and is not part of this release.
+
 Target: install Stage, open one SHA-pinned ClubHall preview, then return to Stage without reinstalling.
 
 ## Verified locally in this preparation

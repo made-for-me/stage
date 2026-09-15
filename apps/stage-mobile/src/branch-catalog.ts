@@ -1,4 +1,5 @@
 import { branchChannel } from "./channel";
+import { getConnection } from "./ops/client";
 import type { StageBranch, StageRuntimeConfig } from "./types";
 
 type StageSnapshot = {
@@ -21,11 +22,16 @@ export async function fetchBranches(
   config: StageRuntimeConfig,
   signal?: AbortSignal,
 ): Promise<StageBranch[]> {
-  if (!config.apiUrl) return embeddedBranches(config);
+  const connection = await getConnection();
+  const apiUrl = connection.url || config.apiUrl;
+  if (!apiUrl) return embeddedBranches(config);
 
-  const response = await fetch(new URL("/api/stage", config.apiUrl), {
+  const response = await fetch(new URL("/api/stage", apiUrl), {
     signal,
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(connection.token ? { Authorization: `Bearer ${connection.token}` } : {}),
+    },
   });
   if (!response.ok) throw new Error(`Stage respondeu HTTP ${response.status}.`);
 

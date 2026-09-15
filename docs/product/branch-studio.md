@@ -1,5 +1,7 @@
 # Branch Studio
 
+Stage now opens on the shared [agent operations workspace](agent-operations.md). The visual branch library described below remains available at `/branches`.
+
 Branch Studio removes the merge-to-preview loop from Expo UI development.
 
 The opening screen is a visual history of branches for one configured project. Each branch is a reel of screenshots captured from the current commit, with its SHA, capture state, and refresh time kept close to the imagery. Selecting two reels opens a route-matched screenshot comparison. The AR2 command surface requests fresh captures and drives comparison without exposing a traditional operator dashboard.

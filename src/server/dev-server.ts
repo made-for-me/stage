@@ -9,10 +9,14 @@ import {
   createLocalPreviewTarget,
 } from "../adapters/local.js";
 import { loadStageConfig } from "../control/config.js";
+import { OpsStore } from "../control/ops-store.js";
 import { StageSessionManager } from "../control/session-manager.js";
 import { buildPreviewManifest } from "../core/pipeline.js";
 import type { StageSessionTarget } from "../types/index.js";
 import { branchStudioHtml, devFrameHtml, devShellHtml } from "./dev-html.js";
+import { operationsHtml } from "./operations-html.js";
+import { createOpsApi } from "./ops-api.js";
+import { opsPrincipal } from "./ops-auth.js";
 
 export type StageDevServerOptions = {
   cwd: string;
@@ -24,17 +28,48 @@ export type StageDevServerOptions = {
 };
 
 export async function startStageDevServer(options: StageDevServerOptions): Promise<Server> {
+  if (
+    process.env.STAGE_AGENT_TOKEN &&
+    process.env.STAGE_AGENT_TOKEN === process.env.STAGE_OPERATOR_TOKEN
+  ) {
+    throw new Error("Stage operator and agent tokens must be different.");
+  }
   const browserAssets = await buildBrowserAssets();
   const loadedConfig = await loadStageConfig(options.cwd, options.configPath);
   const sessionManager = loadedConfig ? new StageSessionManager(loadedConfig.config) : null;
+  const opsApi =
+    sessionManager && loadedConfig
+      ? createOpsApi(
+          new OpsStore(path.join(loadedConfig.config.sceneRoot ?? options.cwd, "operations")),
+          sessionManager,
+        )
+      : null;
 
   const server = createServer(async (req, res) => {
     const requestUrl = new URL(req.url ?? "/", `http://127.0.0.1:${options.port}`);
 
+    if (requestUrl.pathname.startsWith("/api/")) {
+      const principal = opsPrincipal(req);
+      if (!principal) {
+        sendJson(res, 401, { error: "Pair with Stage using an operator or agent token." });
+        return;
+      }
+      if (requestUrl.pathname.startsWith("/api/ops") && opsApi) {
+        await opsApi(req, res, requestUrl.pathname, principal);
+        return;
+      }
+    }
+
+    if (requestUrl.pathname === "/branches" && sessionManager) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(branchStudioHtml());
+      return;
+    }
+
     if (requestUrl.pathname === "/" || requestUrl.pathname === "/index.html") {
       if (sessionManager) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(branchStudioHtml());
+        res.end(operationsHtml());
         return;
       }
       const target = await createTargetFromRequest(options, requestUrl);

@@ -136,3 +136,7 @@ This is the basis for route isolation, screenshot review, and future PR validati
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Agent operations
+
+Stage now connects quests, worker actions, and captured app results through a shared control plane. Read the [product contract](docs/product/agent-operations.md) and [Grok worker setup](docs/runtime/grok-worker.md). The native app can pair with your Stage host at runtime; previous local missions remain accessible.

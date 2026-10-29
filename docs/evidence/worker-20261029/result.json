@@ -1,0 +1,107 @@
+{
+  "stageSourceSha": "ca720fac42b3620278fccae1c4179f7348bd4d01",
+  "classification": "Deterministic subprocess fixture with real authenticated HTTP operations, Git commits, Playwright Chromium captures and scripted operator review. Not model inference, human acceptance, or native ClubHall verification.",
+  "preview": "Temporary localhost HTTP static preview; stopped after each capture.",
+  "questId": "4cf86f42-c34a-4f4b-b90f-a463a03fd0a4",
+  "runs": [
+    {
+      "runId": "cf2275b5-e016-467a-831a-66525050cd9a",
+      "baseSha": "ad1980cda6e658f855658ad9a08ec506e0c78145",
+      "sha": "4602c95b859f6331a354dda3d10373691157caa8",
+      "status": "review",
+      "startedAt": "2026-10-29T19:01:23.310Z",
+      "image": "first.png",
+      "imageSha256": "4698c0ad7ef842ff5401b6a63349fc4ba16d880b84d9b2f32e90b8948cff1d4f"
+    },
+    {
+      "runId": "14b59598-440b-44f8-b867-7cbd4a94f9a9",
+      "baseSha": "4602c95b859f6331a354dda3d10373691157caa8",
+      "sha": "c251b3a2f159f63d5921b0ead084ea172bc466fb",
+      "status": "review",
+      "startedAt": "2026-10-29T19:01:27.708Z",
+      "image": "revision.png",
+      "imageSha256": "87c03bc26acb0bf270e8800f6d84db831b95c3cba4212fbfa9d38d6f069d07f4"
+    }
+  ],
+  "events": [
+    {
+      "id": "c97d26fe-207f-4ae2-8cb9-2e390da43b30",
+      "at": "2026-10-29T19:01:23.273Z",
+      "actor": "operator",
+      "message": "Quest queued. Waiting for the assigned agent."
+    },
+    {
+      "id": "656519ea-8bee-440d-b713-5b5c3cf80701",
+      "at": "2026-10-29T19:01:23.301Z",
+      "actor": "codex-proof",
+      "message": "Agent claimed the quest."
+    },
+    {
+      "id": "731258ce-c464-4d74-bb62-aeeacdb025c3",
+      "at": "2026-10-29T19:01:23.678Z",
+      "actor": "codex-proof",
+      "message": "Coding run cf2275b5-e016-467a-831a-66525050cd9a at ad1980cda6e658f855658ad9a08ec506e0c78145; isolated worktree. Logs remain on the host."
+    },
+    {
+      "id": "eb74a4b9-474f-470b-824d-0f8754a28c8b",
+      "at": "2026-10-29T19:01:24.211Z",
+      "actor": "codex-proof",
+      "message": "Code advanced from ad1980cda6e658f855658ad9a08ec506e0c78145 to 4602c95b859f6331a354dda3d10373691157caa8; awaiting preview review."
+    },
+    {
+      "id": "ed50c9fb-9bfe-4bb4-b3cc-a59280968491",
+      "at": "2026-10-29T19:01:24.217Z",
+      "actor": "codex-proof",
+      "message": "Verified code commit 4602c95b859f6331a354dda3d10373691157caa8 from ad1980cda6e658f855658ad9a08ec506e0c78145. Run cf2275b5-e016-467a-831a-66525050cd9a; awaiting current preview evidence."
+    },
+    {
+      "id": "42b01101-33c9-4dcb-8b86-5d02c36299a3",
+      "at": "2026-10-29T19:01:27.653Z",
+      "actor": "codex-proof",
+      "message": "Result submitted with captured scenes. Waiting for operator review."
+    },
+    {
+      "id": "d6743656-c3e0-4a83-9b85-593ef1b4b356",
+      "at": "2026-10-29T19:01:27.697Z",
+      "actor": "operator",
+      "message": "revise: Keep the existing heading and disclosure. Rename the button from Review result to Review revised result, and add a visible sentence Revision two is ready for review."
+    },
+    {
+      "id": "62d74102-9e3f-4170-88c8-75d7ed1bfcb0",
+      "at": "2026-10-29T19:01:27.704Z",
+      "actor": "codex-proof",
+      "message": "Agent claimed the quest."
+    },
+    {
+      "id": "83cac0ae-1cd6-4143-bd82-3691c5c1a828",
+      "at": "2026-10-29T19:01:27.918Z",
+      "actor": "codex-proof",
+      "message": "Coding run 14b59598-440b-44f8-b867-7cbd4a94f9a9 at 4602c95b859f6331a354dda3d10373691157caa8; isolated worktree. Logs remain on the host."
+    },
+    {
+      "id": "03c033ca-7fdd-4329-927e-b64a328012cd",
+      "at": "2026-10-29T19:01:28.329Z",
+      "actor": "codex-proof",
+      "message": "Code advanced from 4602c95b859f6331a354dda3d10373691157caa8 to c251b3a2f159f63d5921b0ead084ea172bc466fb; awaiting preview review."
+    },
+    {
+      "id": "69c65d86-44ad-455c-b3d2-cffb1e57d0c6",
+      "at": "2026-10-29T19:01:28.337Z",
+      "actor": "codex-proof",
+      "message": "Verified code commit c251b3a2f159f63d5921b0ead084ea172bc466fb from 4602c95b859f6331a354dda3d10373691157caa8. Run 14b59598-440b-44f8-b867-7cbd4a94f9a9; awaiting current preview evidence."
+    },
+    {
+      "id": "12b84046-5d3c-4bb0-89de-383d21c6e0be",
+      "at": "2026-10-29T19:01:32.481Z",
+      "actor": "codex-proof",
+      "message": "Result submitted with captured scenes. Waiting for operator review."
+    },
+    {
+      "id": "3a73d566-8fd0-4e56-83d4-62f9f424fb8a",
+      "at": "2026-10-29T19:01:32.688Z",
+      "actor": "operator",
+      "message": "accept: Scripted integration check: two deterministic subprocess edits, verification commands and current Chromium captures. Not human product/design acceptance."
+    }
+  ],
+  "finalStatus": "done"
+}

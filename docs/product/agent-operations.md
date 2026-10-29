@@ -29,6 +29,8 @@ Stage adopts that separation: quest selection, an inspectable result, and agent/
 
 ## Boundaries and next integration
 
+An opt-in [bounded local coding worker](../runtime/coding-worker.md) now connects an operator-configured subprocess to these operations. Its real Codex inference attempt is blocked by runtime authentication; deterministic subprocess tests do not close that gate.
+
 The Grok worker itself is not included: we have not been given its runtime, launch command, or tool registration configuration. The contract is ready for it to claim work and post results. No model API key is needed by Stage. A worker must bring its coding/browser/simulator tools and run a polling or event-driven loop. The included adapter performs requests; it is not an autonomous coding agent.
 
 The Device Hub host must run where devices exist (macOS + Xcode for iOS, Android SDK for Android). This change does not provision that host, proxy video, install Hub into ClubHall, publish an OTA, or produce a TestFlight build. A successful iOS bundle export is not on-device validation.

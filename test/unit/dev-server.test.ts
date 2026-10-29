@@ -49,7 +49,7 @@ describe("Stage branch studio API", () => {
             localRoot: repository,
             appRoot: "apps/mobile",
             baselineBranch: "main",
-            trackedBranches: [],
+            trackedBranches: ["task/coding"],
             preview: {
               mode: "stage",
               scenario: "tennis-ready",
@@ -241,5 +241,66 @@ describe("Stage branch studio API", () => {
       quests: { status: string }[];
     };
     expect(done.quests[0].status).toBe("done");
+    // A code-changing worker advances only its dedicated branch under the current lease.
+    const baseSha = (
+      await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repository })
+    ).stdout.trim();
+    await execFileAsync("git", ["branch", "task/coding"], { cwd: repository });
+    const codingWorktree = path.join(root, "coding-worktree");
+    await execFileAsync("git", ["worktree", "add", "--detach", codingWorktree, baseSha], {
+      cwd: repository,
+    });
+    await writeFile(path.join(codingWorktree, "coded.txt"), "real fixture subprocess change");
+    await execFileAsync("git", ["add", "coded.txt"], { cwd: codingWorktree });
+    await execFileAsync("git", ["commit", "-m", "fixture worker change"], { cwd: codingWorktree });
+    const codeSha = (
+      await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: codingWorktree })
+    ).stdout.trim();
+    expect((await action({ ...create, branch: "task/coding" })).status).toBe(201);
+    const codingClaim = (await (
+      await action({ action: "claim", agentId: "grok" }, true)
+    ).json()) as typeof claimed;
+    const codingWorker = {
+      ...worker,
+      questId: codingClaim.quest.id,
+      leaseToken: codingClaim.quest.lease.token,
+    };
+    expect(
+      (
+        await action(
+          { action: "advance", ...codingWorker, baseSha: "0".repeat(40), sha: codeSha },
+          true,
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (await action({ action: "advance", ...codingWorker, baseSha, sha: codeSha }, true)).status,
+    ).toBe(200);
+    expect(
+      (await execFileAsync("git", ["rev-parse", "task/coding"], { cwd: repository })).stdout.trim(),
+    ).toBe(codeSha);
+    // A response timeout can be reconciled by retrying the exact same advancement.
+    expect(
+      await (
+        await action({ action: "advance", ...codingWorker, baseSha, sha: codeSha }, true)
+      ).json(),
+    ).toMatchObject({ sha: codeSha, alreadyAdvanced: true });
+    // Cancellation fences late code writes; the original checkout is untouched.
+    expect(
+      (
+        await action({
+          action: "review",
+          questId: codingWorker.questId,
+          decision: "cancel",
+          note: "Stop executor",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await action({ action: "advance", ...codingWorker, baseSha, sha: codeSha }, true)).status,
+    ).toBe(400);
+    expect(
+      (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repository })).stdout.trim(),
+    ).toBe(baseSha);
   });
 });

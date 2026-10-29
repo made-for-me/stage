@@ -1,8 +1,12 @@
+import { execFile } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { promisify } from "node:util";
 import type { OpsStore } from "../control/ops-store.js";
 import type { StageSessionManager } from "../control/session-manager.js";
 import { deviceHubStatus } from "./device-hub.js";
 import type { OpsPrincipal } from "./ops-auth.js";
+
+const execFileAsync = promisify(execFile);
 
 export const opsCapabilities = {
   version: 1,
@@ -25,6 +29,10 @@ export const opsCapabilities = {
     session: {
       role: "agent",
       fields: ["questId", "agentId", "leaseToken", "target: web | dev-client"],
+    },
+    advance: {
+      role: "agent",
+      fields: ["questId", "agentId", "leaseToken", "baseSha", "sha"],
     },
     submit: {
       role: "agent",
@@ -142,6 +150,42 @@ export function createOpsApi(store: OpsStore, sessions: StageSessionManager) {
           );
           if (!branch?.sha || branch.availability !== "available")
             throw new Error("Branch unavailable. Report a blocker with the missing setup.");
+          if (action === "advance") {
+            const baseSha = str(body.baseSha, "baseSha", 40);
+            const sha = str(body.sha, "sha", 40);
+            if (![baseSha, sha].every((value) => /^[0-9a-f]{40}$/.test(value)))
+              throw new Error("Use full commit SHAs.");
+            if (["main", "master"].includes(q.branch))
+              throw new Error("Use a dedicated task branch.");
+            const project = stage.projects.find((p) => p.id === q.projectId);
+            if (!project) throw new Error("Project unavailable.");
+            const git = async (args: string[]) =>
+              (
+                await execFileAsync("git", args, {
+                  cwd: project.localRoot,
+                  timeout: 10_000,
+                  maxBuffer: 1024 * 1024,
+                })
+              ).stdout.trim();
+            const worktrees = await git(["worktree", "list", "--porcelain"]);
+            if (worktrees.split("\n").includes(`branch refs/heads/${q.branch}`))
+              throw new Error("Task branch is checked out; preserve its working tree.");
+            if ((await git(["rev-parse", `${sha}^`])) !== baseSha)
+              throw new Error("Commit parent mismatch.");
+            if (branch.sha === sha) return { sha, alreadyAdvanced: true };
+            if (branch.sha !== baseSha) throw new Error("Branch drift.");
+            // Serialized with cancel/revise; no stale lease can advance the task ref.
+            // Recheck time after Git inspection, before the atomic compare-and-swap.
+            if (!q.lease || q.lease.expiresAt <= Date.now())
+              throw new Error("Quest lease expired.");
+            await git(["update-ref", `refs/heads/${q.branch}`, sha, baseSha]);
+            store.record(
+              q,
+              agentId,
+              `Code advanced from ${baseSha} to ${sha}; awaiting preview review.`,
+            );
+            return { sha };
+          }
           if (action === "capture") {
             const capture = await sessions.captures.request({
               projectId: q.projectId,

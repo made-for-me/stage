@@ -22,7 +22,13 @@ A `StageSessionRef` is the stable browser contract for a running preview.
 
 Lifecycle: `preparing` → `starting` → `live` → `stopped`, with `failed` available from any active state.
 
-Stage retains worktrees after stop so dependency links and Metro caches can be reused. A session never mutates the branch ref: worktrees are detached at the selected ref.
+Stage retains worktrees after stop so dependency links and Metro caches can be reused. Cache paths
+include the exact inspected commit. Reuse requires the same clean detached SHA and source Git common
+directory; Stage does not reset a cache containing changes or a different commit. Starting another
+target cannot prepare a checkout already owned by an active session or a process still closing.
+A session never mutates the branch ref: worktrees are detached at the selected commit. Stopping during
+preparation terminates its owned process group and cannot launch the preview afterward. These guards
+are scoped to one session manager; they are not an OS lock against external editors or other servers.
 
 ## Scene model
 

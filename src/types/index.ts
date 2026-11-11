@@ -79,6 +79,8 @@ export type StageBranchRef = {
 
 export type StageSessionRef = {
   id: string;
+  /** Distinguishes restarts that reuse the same public session ID. */
+  instanceId?: string;
   projectId: string;
   branch: string;
   sha: string | null;

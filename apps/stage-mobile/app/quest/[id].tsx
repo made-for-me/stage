@@ -1,4 +1,5 @@
 import { type Connection, getConnection, opsRequest, statusLabel } from "@/ops/client";
+import { ExecutionPicker } from "@/ops/execution-picker";
 import { Button, C, Card, Copy, Field, Label } from "@/ops/ui";
 import { useOps } from "@/ops/use-ops";
 import { Image } from "expo-image";
@@ -14,16 +15,47 @@ export default function QuestDetail() {
   const [message, setMessage] = useState("");
   const [connection, setConnection] = useState<Connection | null>(null);
   const quest = data?.quests.find((q) => q.id === id);
+  const [selectedExecution, setSelectedExecution] = useState<{
+    questId: string;
+    revision: number;
+    value: string;
+  } | null>(null);
+  const executionSessions = (data?.executionSessions ?? []).filter(
+    (session) => session.projectId === quest?.projectId && session.branch === quest?.branch,
+  );
+  const pin = quest?.executionTarget?.worktree;
+  const initialExecution = !pin
+    ? ""
+    : executionSessions.some(
+          (session) => session.id === pin.sessionId && session.instanceId === pin.sessionInstanceId,
+        )
+      ? pin.sessionId
+      : "__unavailable__";
+  const executionSessionId =
+    selectedExecution?.questId === quest?.id && selectedExecution?.revision === quest?.revision
+      ? (selectedExecution?.value ?? initialExecution)
+      : initialExecution;
+  const executionValid =
+    !executionSessionId || executionSessions.some((session) => session.id === executionSessionId);
   useEffect(() => {
     getConnection()
       .then(setConnection)
       .catch(() => setMessage("Could not load the host connection."));
   }, []);
   async function review(decision: "accept" | "revise" | "cancel") {
+    if (!quest || (decision === "revise" && !executionValid)) return;
     setBusy(true);
     setMessage("");
     try {
-      await opsRequest("/api/ops/actions", { action: "review", questId: id, decision, note });
+      await opsRequest("/api/ops/actions", {
+        action: "review",
+        questId: id,
+        revision: quest.revision,
+        evidenceId: quest.evidence?.id ?? null,
+        decision,
+        note,
+        ...(decision === "revise" ? { executionSessionId: executionSessionId || null } : {}),
+      });
       setNote("");
       await refresh();
     } catch (e) {
@@ -48,12 +80,35 @@ export default function QuestDetail() {
           <Copy size={32}>{quest.title}</Copy>
           <Copy muted>{quest.objective}</Copy>
           <Copy muted size={12}>
-            {quest.assignedTo} · {quest.branch}
+            {quest.assignedTo} · {quest.branch} · Revision {quest.revision}
           </Copy>
+          <Card>
+            <Label>Execution · Revision {quest.revision}</Label>
+            <Copy size={13}>{pin ? `Managed preview · ${pin.sessionId}` : "Source checkout"}</Copy>
+            <Copy muted size={12}>
+              {quest.executionTarget?.sha.slice(0, 12) ?? "Not pinned"}
+            </Copy>
+            <Copy muted size={12}>
+              {pin?.root ??
+                quest.executionTarget?.repositoryRoot ??
+                "Select a checkout when retrying."}
+            </Copy>
+            {quest.executionIssue && <Copy size={13}>{quest.executionIssue}</Copy>}
+            {quest.status === "blocked" && (
+              <Copy size={13}>Blocked: {quest.events.at(-1)?.message}</Copy>
+            )}
+          </Card>
           {quest.evidence ? (
             <>
-              <Label>Captured result · {quest.evidence.sha.slice(0, 8)}</Label>
-              {data?.scenes
+              <Label>
+                {quest.evidence.provenance === "simulated"
+                  ? "Simulation — cannot be accepted"
+                  : quest.evidence.provenance === "legacy"
+                    ? "Legacy evidence — recapture required"
+                    : "Worker-reported result"}{" "}
+                · {quest.evidence.sha.slice(0, 8)}
+              </Label>
+              {data?.evidenceScenes
                 .filter((s) => quest.evidence?.sceneIds.includes(s.id))
                 .map((scene) => (
                   <Card key={scene.id}>
@@ -96,6 +151,15 @@ export default function QuestDetail() {
           ))}
           {!["done", "cancelled"].includes(quest.status) && (
             <Card>
+              {["review", "blocked"].includes(quest.status) && (
+                <ExecutionPicker
+                  sessions={executionSessions}
+                  value={executionSessionId}
+                  onChange={(value) =>
+                    setSelectedExecution({ questId: quest.id, revision: quest.revision, value })
+                  }
+                />
+              )}
               <Field
                 label="Your feedback"
                 value={note}
@@ -106,7 +170,12 @@ export default function QuestDetail() {
               {quest.status === "review" && (
                 <Button
                   title="Accept result"
-                  disabled={busy || !!error || !note.trim()}
+                  disabled={
+                    busy ||
+                    !!error ||
+                    !note.trim() ||
+                    quest.evidence?.provenance !== "worker-reported"
+                  }
                   onPress={() => void review("accept")}
                 />
               )}
@@ -114,7 +183,7 @@ export default function QuestDetail() {
                 <Button
                   title={quest.status === "blocked" ? "Resolve & retry" : "Request changes"}
                   secondary
-                  disabled={busy || !!error || !note.trim()}
+                  disabled={busy || !!error || !note.trim() || !executionValid}
                   onPress={() => void review("revise")}
                 />
               )}
@@ -124,6 +193,45 @@ export default function QuestDetail() {
                 disabled={busy || !!error || !note.trim()}
                 onPress={() => void review("cancel")}
               />
+            </Card>
+          )}
+          {quest.reviews.length > 0 && (
+            <Card>
+              <Label>Revision history</Label>
+              {quest.reviews.map((review) => {
+                const evidence = quest.submissions.find((item) => item.id === review.evidenceId);
+                return (
+                  <View key={review.id} style={{ gap: 6 }}>
+                    <Copy>
+                      Revision {review.revision} · {review.decision}
+                    </Copy>
+                    <Copy muted>{review.note}</Copy>
+                    {evidence && (
+                      <Copy muted size={12}>
+                        {evidence.provenance} · {evidence.sha.slice(0, 8)} · {evidence.summary}
+                      </Copy>
+                    )}
+                    {connection &&
+                      evidence &&
+                      data?.evidenceScenes
+                        .filter((scene) => evidence.sceneIds.includes(scene.id))
+                        .map((scene) => (
+                          <Image
+                            key={scene.id}
+                            accessibilityLabel={`Revision ${review.revision}: ${scene.title}`}
+                            source={{
+                              uri: new URL(scene.imageUrl, connection.url).href,
+                              headers: connection.token
+                                ? { Authorization: `Bearer ${connection.token}` }
+                                : {},
+                            }}
+                            style={{ width: "100%", height: 240, borderRadius: 16 }}
+                            contentFit="contain"
+                          />
+                        ))}
+                  </View>
+                );
+              })}
             </Card>
           )}
           <Label>Activity</Label>

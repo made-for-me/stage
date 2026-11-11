@@ -30,11 +30,16 @@ export class StageSceneStore {
     this.#manifestPath = path.join(root, "manifest.json");
   }
 
-  async list(input?: { projectId?: string; branch?: string; sha?: string }): Promise<
-    StageSceneRef[]
-  > {
+  async list(input?: {
+    projectId?: string;
+    branch?: string;
+    sha?: string;
+    includeHistory?: boolean;
+  }): Promise<StageSceneRef[]> {
     const scenes = await this.readManifest();
+    const seen = new Set<string>();
     return scenes
+      .reverse()
       .filter(
         (scene) =>
           (!input?.projectId || scene.projectId === input.projectId) &&
@@ -42,6 +47,13 @@ export class StageSceneStore {
           (!input?.sha || scene.sha === input.sha),
       )
       .sort((left, right) => right.capturedAt.localeCompare(left.capturedAt))
+      .filter((scene) => {
+        if (input?.includeHistory) return true;
+        const key = `${scene.projectId}\0${scene.branch}\0${scene.sha}\0${scene.route}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .map(({ file: _file, mimeType: _mimeType, ...scene }) => ({
         ...scene,
         imageUrl: `/api/scenes/${encodeURIComponent(scene.id)}/image`,
@@ -61,7 +73,8 @@ export class StageSceneStore {
       throw new Error("Scene image must be between 1 byte and 8 MB.");
     }
 
-    const key = `${input.projectId}\0${input.branch}\0${input.sha}\0${input.route}`;
+    const contentHash = createHash("sha256").update(image).digest("hex");
+    const key = `${input.projectId}\0${input.branch}\0${input.sha}\0${input.route}\0${contentHash}`;
     const id = createHash("sha256").update(key).digest("hex").slice(0, 24);
     const extension = match[1] === "image/jpeg" ? "jpg" : match[1].slice("image/".length);
     const file = path.join("assets", `${id}.${extension}`);
@@ -74,7 +87,7 @@ export class StageSceneStore {
       title: input.title,
       route: input.route,
       capturedAt,
-      contentHash: createHash("sha256").update(image).digest("hex").slice(0, 16),
+      contentHash,
       width: positiveInteger(input.width),
       height: positiveInteger(input.height),
       file,

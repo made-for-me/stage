@@ -47,12 +47,35 @@ export async function opsRequest<T>(
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? `Stage returned ${response.status}.`);
+    if (pathname === "/api/ops" && result.contractVersion !== 2)
+      throw new Error(
+        "Update your Stage host to use revision-aware result review (operations v2).",
+      );
     return result;
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener("abort", abort);
   }
 }
+export type OpsEvidence = {
+  id: string;
+  revision: number;
+  submittedAt: string;
+  agentId: string;
+  provenance: "worker-reported" | "simulated" | "legacy";
+  summary: string;
+  sha: string;
+  sceneIds: string[];
+};
+export type ExecutionSession = {
+  id: string;
+  instanceId: string;
+  projectId: string;
+  branch: string;
+  sha: string;
+  target: string;
+  worktreeRoot: string;
+};
 export type OpsQuest = {
   id: string;
   title: string;
@@ -63,7 +86,22 @@ export type OpsQuest = {
   assignedTo: string;
   status: string;
   stalled: boolean;
-  evidence: { summary: string; sha: string; sceneIds: string[] } | null;
+  revision: number;
+  executionTarget?: {
+    repositoryRoot: string;
+    sha: string;
+    worktree?: { root: string; sessionId: string; sessionInstanceId: string };
+  } | null;
+  executionIssue?: string | null;
+  evidence: OpsEvidence | null;
+  submissions: OpsEvidence[];
+  reviews: {
+    id: string;
+    revision: number;
+    evidenceId: string | null;
+    decision: string;
+    note: string;
+  }[];
   events: { id: string; at: string; actor: string; message: string }[];
 };
 export type OpsSnapshot = {
@@ -71,6 +109,8 @@ export type OpsSnapshot = {
   agents: { id: string; online: boolean; seenAt: number }[];
   branches: { projectId: string; name: string; sha: string | null }[];
   scenes: { id: string; title: string; imageUrl: string }[];
+  evidenceScenes: { id: string; title: string; imageUrl: string }[];
+  executionSessions?: ExecutionSession[];
   agentConfigured: boolean;
 };
 export const statusLabel: Record<string, string> = {

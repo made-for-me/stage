@@ -24,7 +24,7 @@ try {
     snapshot: "/api/ops",
     devices: "/api/ops/devices",
     action: "/api/ops/actions",
-    scene: "/api/scenes",
+    scene: "/api/ops/scenes",
   };
   if (!Object.hasOwn(paths, command))
     throw new Error("Use capabilities, snapshot, devices, action, or scene.");

@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { realpath } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { StageBranchRef, StageProjectConfig } from "../types/index.js";
+import { gitCommonDirectory, workerEnvironment } from "./execution-target.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -47,14 +49,42 @@ export async function listProjectBranches(project: StageProjectConfig): Promise<
 
 export async function ensureWorktree(options: {
   project: StageProjectConfig;
-  branch: string;
+  sha: string;
   destination: string;
 }): Promise<string> {
-  const { project, branch, destination } = options;
-  const ref = await resolveRef(project.localRoot, branch);
-  const sha = (await git(project.localRoot, ["rev-parse", ref])).trim();
+  const { project, sha, destination } = options;
+  if (
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(sha) ||
+    (await git(project.localRoot, ["rev-parse", "--verify", `${sha}^{commit}`])).trim() !== sha
+  )
+    throw new Error("Prepare a worktree only from an exact inspected commit.");
   if (existsSync(path.join(destination, ".git"))) {
-    await git(destination, ["reset", "--hard", sha]);
+    if (
+      (await realpath(destination)) !==
+        (await realpath((await git(destination, ["rev-parse", "--show-toplevel"])).trim())) ||
+      (await gitCommonDirectory(destination)) !== (await gitCommonDirectory(project.localRoot))
+    )
+      throw new Error("Cached preview belongs to another Git checkout; its files were preserved.");
+    if (
+      (
+        await git(destination, [
+          "status",
+          "--porcelain=v1",
+          "--untracked-files=all",
+          "--ignore-submodules=none",
+        ])
+      ).trim()
+    )
+      throw new Error(
+        "Cached preview has local changes. Preserve them before retrying; no reset was performed.",
+      );
+    if (
+      (await git(destination, ["rev-parse", "HEAD"])).trim() !== sha ||
+      (await git(destination, ["rev-parse", "--abbrev-ref", "HEAD"])).trim() !== "HEAD"
+    )
+      throw new Error(
+        "Cached preview no longer matches its detached commit; no reset was performed.",
+      );
     return destination;
   }
   await git(project.localRoot, ["worktree", "add", "--detach", destination, sha]);
@@ -67,17 +97,17 @@ async function inspectBranch(project: StageProjectConfig, name: string): Promise
     const sha = (await git(project.localRoot, ["rev-parse", ref])).trim();
     const packageText = await showOptional(
       project.localRoot,
-      ref,
+      sha,
       path.posix.join(project.appRoot, "package.json"),
     );
     const sdkVersion = packageText ? readExpoVersion(packageText) : null;
     const fingerprintInputs = await Promise.all([
       Promise.resolve(packageText ?? ""),
-      showOptional(project.localRoot, ref, path.posix.join(project.appRoot, "app.json")),
-      showOptional(project.localRoot, ref, path.posix.join(project.appRoot, "app.config.ts")),
-      showOptional(project.localRoot, ref, "pnpm-lock.yaml"),
-      treeHashOptional(project.localRoot, ref, path.posix.join(project.appRoot, "ios")),
-      treeHashOptional(project.localRoot, ref, path.posix.join(project.appRoot, "android")),
+      showOptional(project.localRoot, sha, path.posix.join(project.appRoot, "app.json")),
+      showOptional(project.localRoot, sha, path.posix.join(project.appRoot, "app.config.ts")),
+      showOptional(project.localRoot, sha, "pnpm-lock.yaml"),
+      treeHashOptional(project.localRoot, sha, path.posix.join(project.appRoot, "ios")),
+      treeHashOptional(project.localRoot, sha, path.posix.join(project.appRoot, "android")),
     ]);
     const runtimeFingerprint = createHash("sha256")
       .update(fingerprintInputs.join("\n---stage-runtime---\n"))
@@ -129,6 +159,7 @@ async function treeHashOptional(root: string, ref: string, treePath: string): Pr
 async function git(root: string, args: string[]): Promise<string> {
   const result = await execFileAsync("git", ["-C", root, ...args], {
     maxBuffer: 16 * 1024 * 1024,
+    env: workerEnvironment(),
   });
   return result.stdout;
 }

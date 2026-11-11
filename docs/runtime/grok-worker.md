@@ -17,6 +17,10 @@ Run the Hub on the device machine using its official instructions: `npx expo-dev
 
 ## Tool adapter
 
+For a runnable polling/process bridge, see [Bounded local worker](local-worker.md). The operations
+contract is now version 2: submit requires revision/provenance and review requires the exact evidence
+ID. Existing provider integrations must update those fields before connecting to this host.
+
 Give the Grok worker `STAGE_URL` and `STAGE_AGENT_TOKEN` through its runtime configuration. Register `node scripts/stage-agent.mjs` as a tool with these modes:
 
 | Mode | Input | Result |
@@ -44,13 +48,13 @@ Use the same ownership fields for `heartbeat`, `capture`, and `session`. Send a 
 Capture returns an exact commit and route plan. Navigate and capture using your own device tools, then upload each scene:
 
 ```json
-{"projectId":"clubhall","branch":"<quest branch>","sha":"<actual captured commit>","title":"Replay","route":"/replay","imageDataUrl":"data:image/png;base64,<actual capture>"}
+{"questId":"<id>","agentId":"grok","leaseToken":"<lease>","revision":1,"sha":"<actual captured commit>","title":"Replay","route":"/replay","imageDataUrl":"data:image/png;base64,<actual capture>"}
 ```
 
 Then submit the returned scene IDs:
 
 ```json
-{"action":"submit","questId":"<id>","agentId":"grok","leaseToken":"<lease>","summary":"Describe the actual changes and observed test results, including limitations.","sceneIds":["<scene id>"]}
+{"action":"submit","questId":"<id>","agentId":"grok","leaseToken":"<lease>","revision":1,"provenance":"worker-reported","summary":"Describe the actual changes and observed test results, including limitations.","sceneIds":["<scene id>"]}
 ```
 
 `submit` moves the quest to review, not done. Arthur accepts or requests changes in Stage. Missing repo, simulator, credentials, or build prerequisites should become `block` with an actionable `message`. Do not claim completion without evidence. Stage deliberately has no publish, merge, or deployment action.

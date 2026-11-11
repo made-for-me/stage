@@ -67,6 +67,15 @@ export type OpsEvidence = {
   sha: string;
   sceneIds: string[];
 };
+export type ExecutionSession = {
+  id: string;
+  instanceId: string;
+  projectId: string;
+  branch: string;
+  sha: string;
+  target: string;
+  worktreeRoot: string;
+};
 export type OpsQuest = {
   id: string;
   title: string;
@@ -78,6 +87,12 @@ export type OpsQuest = {
   status: string;
   stalled: boolean;
   revision: number;
+  executionTarget?: {
+    repositoryRoot: string;
+    sha: string;
+    worktree?: { root: string; sessionId: string; sessionInstanceId: string };
+  } | null;
+  executionIssue?: string | null;
   evidence: OpsEvidence | null;
   submissions: OpsEvidence[];
   reviews: {
@@ -95,6 +110,7 @@ export type OpsSnapshot = {
   branches: { projectId: string; name: string; sha: string | null }[];
   scenes: { id: string; title: string; imageUrl: string }[];
   evidenceScenes: { id: string; title: string; imageUrl: string }[];
+  executionSessions?: ExecutionSession[];
   agentConfigured: boolean;
 };
 export const statusLabel: Record<string, string> = {

@@ -48,6 +48,26 @@ they are not a filesystem lock, OS sandbox, or restriction on the trusted comman
 A concurrent external editor or separately requested session preparation can still change the worktree.
 Persistent preview process ownership remains separate from the bounded command.
 
+## Select a checkout in the operator UI
+
+Desktop and mobile quest creation now include **Run in**. Source checkout is the default;
+only active managed previews matching the selected project, branch and current commit appear.
+Changing the branch clears the previous preview selection. Quest details show the pinned checkout,
+base commit and revision, plus the worker's blocker when execution cannot proceed.
+
+Use **Choose checkout & retry** on desktop or **Resolve & retry** on mobile to select the next
+revision's checkout. A stopped or replaced preview is shown as unavailable and requires an explicit
+selection. Choosing Source checkout sends an explicit null selection, clearing the old managed pin.
+Accept/cancel actions do not change the execution target. Form errors preserve the entered feedback.
+
+Managed session caches are now scoped to the inspected commit. Preparing a newer commit creates a
+separate cache; existing cached files are never reset. Reusing a cache requires a clean detached
+checkout at that exact SHA with the configured source Git common directory. One session manager
+rejects overlapping preparation/preview ownership of the same checkout. Cancellation terminates the
+owned POSIX process group, including preparation descendants, and retains process ownership until
+close. Commands must not escape by detaching into new sessions. Cross-process/server ownership and
+leases from separate worker processes remain outside this in-memory session guard.
+
 The driver receives one JSON object on stdin:
 
 ```json

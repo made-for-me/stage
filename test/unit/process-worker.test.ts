@@ -90,9 +90,10 @@ async function setup(driver?: string) {
     body: Record<string, unknown>,
     principal: "agent" | "operator" = "operator",
     endpoint = "/api/ops/actions",
+    method = "POST",
   ) => {
     const req = Readable.from([Buffer.from(JSON.stringify(body))]) as IncomingMessage;
-    req.method = "POST";
+    req.method = method;
     let status = 0;
     let text = "";
     const res = {
@@ -360,6 +361,45 @@ describe("configured local process worker", () => {
     await rejected;
     expect(() => process.kill(pid, 0)).toThrow();
     expect((await h.store.snapshot()).quests[0].submissions).toHaveLength(0);
+  });
+
+  it("exposes only current execution choices and explains an unavailable selected preview", async () => {
+    const h = await setupPreview();
+    const snapshot = async () =>
+      (await (await h.send({}, "operator", "/api/ops", "GET")).json()) as {
+        executionSessions: { id: string }[];
+        quests: { executionIssue: string | null }[];
+      };
+    let view = await snapshot();
+    expect(view.executionSessions.map((session) => session.id)).toEqual(["clubhall-main-web"]);
+    expect(view.quests[0].executionIssue).toBeNull();
+    h.managedSessions[0].status = "stopped";
+    view = await snapshot();
+    expect(view.executionSessions).toHaveLength(0);
+    expect(view.quests[0].executionIssue).toContain(
+      "Select a current preview or the source checkout",
+    );
+  });
+
+  it("explicitly clears a previous managed pin when the operator selects the source checkout", async () => {
+    const h = await setupPreview();
+    expect(await runWorkerOnce(h.options)).toBe("review");
+    const current = (await h.store.snapshot()).quests[0];
+    const response = await h.send({
+      action: "review",
+      questId: current.id,
+      revision: current.revision,
+      evidenceId: current.evidence?.id,
+      decision: "revise",
+      note: "Continue in source checkout",
+      executionSessionId: null,
+    });
+    expect(response.status).toBe(200);
+    const next = (await h.store.snapshot()).quests[0];
+    expect(next.revision).toBe(3);
+    expect(next.executionTarget?.worktree).toBeUndefined();
+    expect(next.submissions[0].executionTarget?.worktree?.sessionId).toBe("clubhall-main-web");
+    expect(await runWorkerOnce({ ...h.options, cwd: h.root })).toBe("review");
   });
 
   it("rejects another checkout even when its branch and commit exactly match", async () => {

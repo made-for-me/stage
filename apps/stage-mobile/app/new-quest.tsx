@@ -1,4 +1,5 @@
 import { opsRequest } from "@/ops/client";
+import { ExecutionPicker } from "@/ops/execution-picker";
 import { Button, C, Copy, Field, Label } from "@/ops/ui";
 import { useOps } from "@/ops/use-ops";
 import { router } from "expo-router";
@@ -11,11 +12,19 @@ export default function NewQuest() {
   const [criteria, setCriteria] = useState("");
   const [agent, setAgent] = useState("grok");
   const [branchIndex, setBranch] = useState(0);
+  const [executionSessionId, setExecutionSession] = useState("");
+  const selectedBranch = data?.branches[branchIndex];
+  const executionSessions = (data?.executionSessions ?? []).filter(
+    (session) =>
+      session.projectId === selectedBranch?.projectId && session.branch === selectedBranch?.name,
+  );
+  const executionValid =
+    !executionSessionId || executionSessions.some((session) => session.id === executionSessionId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function create() {
     const branch = data?.branches[branchIndex];
-    if (!branch) return;
+    if (!branch || !executionValid) return;
     setBusy(true);
     setMessage("");
     try {
@@ -27,6 +36,7 @@ export default function NewQuest() {
         assignedTo: agent,
         projectId: branch.projectId,
         branch: branch.name,
+        executionSessionId: executionSessionId || null,
       });
       router.back();
     } catch (e) {
@@ -63,7 +73,10 @@ export default function NewQuest() {
             accessibilityRole="radio"
             accessibilityState={{ checked: branchIndex === i }}
             key={`${b.projectId}/${b.name}`}
-            onPress={() => setBranch(i)}
+            onPress={() => {
+              setBranch(i);
+              setExecutionSession("");
+            }}
             style={{
               padding: 15,
               borderRadius: 14,
@@ -76,6 +89,11 @@ export default function NewQuest() {
           </Pressable>
         ))}
       </View>
+      <ExecutionPicker
+        sessions={executionSessions}
+        value={executionSessionId}
+        onChange={setExecutionSession}
+      />
       <Field label="Assigned agent" value={agent} onChangeText={setAgent} />
       {(message || error) && <Copy>{message || error}</Copy>}
       <Button
@@ -83,6 +101,7 @@ export default function NewQuest() {
         disabled={
           busy ||
           !!error ||
+          !executionValid ||
           !data?.branches.length ||
           !title.trim() ||
           !objective.trim() ||

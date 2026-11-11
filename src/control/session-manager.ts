@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import type {
   StageBranchRef,
@@ -15,7 +15,11 @@ import { StageCaptureStore } from "./capture-store.js";
 import { ensureWorktree, listProjectBranches } from "./git.js";
 import { StageSceneStore } from "./scene-store.js";
 
-type ManagedSession = StageSessionRef & { process?: ChildProcess };
+type ManagedSession = StageSessionRef & {
+  process?: ChildProcess;
+  preparing?: boolean;
+  stopProcess?: () => void;
+};
 
 export class StageSessionManager {
   readonly #config: StageConfig;
@@ -77,7 +81,10 @@ export class StageSessionManager {
   }
 
   listSessions(): StageSessionRef[] {
-    return [...this.#sessions.values()].map(({ process: _process, ...session }) => session);
+    return [...this.#sessions.values()].map(
+      ({ process: _process, preparing: _preparing, stopProcess: _stopProcess, ...session }) =>
+        session,
+    );
   }
 
   async startSession(input: {
@@ -110,10 +117,34 @@ export class StageSessionManager {
       return this.publicSession(existing);
     }
 
+    if (!branch.sha) throw new Error("The selected branch has no exact commit.");
+    const configuredWorkspace = this.#config.workspaceRoot ?? path.resolve(".stage-worktrees");
+    await mkdir(configuredWorkspace, { recursive: true });
+    const workspaceRoot = await realpath(configuredWorkspace);
+    const worktreeRoot = path.join(
+      workspaceRoot,
+      project.id,
+      `${slug(input.branch)}-${branch.sha}`,
+    );
     const id = `${project.id}-${slug(input.branch)}-${input.target}`;
+    const owner = [...this.#sessions.values()].find(
+      (session) =>
+        (session.worktreeRoot === worktreeRoot || session.id === id) &&
+        (session.preparing || !["stopped", "failed"].includes(session.status) || session.process),
+    );
+    if (owner) {
+      if (
+        owner.projectId === input.projectId &&
+        owner.branch === input.branch &&
+        owner.target === input.target &&
+        !["stopped", "failed"].includes(owner.status)
+      )
+        return this.publicSession(owner);
+      throw new Error(
+        "This preview checkout is still owned by another session. Stop it and wait for its process to exit before retrying.",
+      );
+    }
     const port = this.nextPort(project);
-    const workspaceRoot = this.#config.workspaceRoot ?? path.resolve(".stage-worktrees");
-    const worktreeRoot = path.join(workspaceRoot, project.id, slug(input.branch));
     const host = project.host ?? "127.0.0.1";
     const metroUrl = `http://${host}:${port}`;
     const preview = project.preview ?? {
@@ -136,6 +167,7 @@ export class StageSessionManager {
       sha: branch.sha,
       target: input.target,
       status: "preparing",
+      preparing: true,
       port,
       worktreeRoot,
       previewUrl: `${metroUrl}?${query}`,
@@ -151,18 +183,29 @@ export class StageSessionManager {
 
     try {
       await mkdir(path.dirname(worktreeRoot), { recursive: true });
-      await ensureWorktree({ project, branch: input.branch, destination: worktreeRoot });
+      await ensureWorktree({ project, sha: branch.sha, destination: worktreeRoot });
+      this.requirePreparing(session);
       if (project.prepareCommand?.length) {
         await this.runPreparation(session, project.prepareCommand, worktreeRoot, project);
       }
+      this.requirePreparing(session);
       this.launch(session, project, worktreeRoot);
       return this.publicSession(session);
     } catch (error) {
-      session.status = "failed";
-      session.error = error instanceof Error ? error.message : String(error);
-      session.updatedAt = new Date().toISOString();
+      if (session.status !== "stopped") {
+        session.status = "failed";
+        session.error = error instanceof Error ? error.message : String(error);
+        session.updatedAt = new Date().toISOString();
+      }
       throw error;
+    } finally {
+      session.preparing = false;
     }
+  }
+
+  requirePreparing(session: ManagedSession): void {
+    if (session.status === "stopped" || this.#sessions.get(session.id) !== session)
+      throw new Error("Session preparation was cancelled; no preview was launched.");
   }
 
   stopSession(id: string): StageSessionRef {
@@ -170,7 +213,7 @@ export class StageSessionManager {
     if (!session) {
       throw new Error(`Unknown Stage session ${id}.`);
     }
-    session.process?.kill("SIGTERM");
+    session.stopProcess?.();
     session.status = "stopped";
     session.updatedAt = new Date().toISOString();
     return this.publicSession(session);
@@ -178,7 +221,7 @@ export class StageSessionManager {
 
   stopAll(): void {
     for (const session of this.#sessions.values()) {
-      session.process?.kill("SIGTERM");
+      session.stopProcess?.();
       session.status = "stopped";
       session.updatedAt = new Date().toISOString();
     }
@@ -190,11 +233,17 @@ export class StageSessionManager {
       return;
     }
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(executable, args, { cwd, env: process.env });
+      this.requirePreparing(session);
+      const child = spawn(executable, args, {
+        cwd,
+        env: process.env,
+        detached: process.platform !== "win32",
+      });
+      this.trackProcess(session, child);
       child.stdout?.on("data", (data) => this.appendLog(session, String(data)));
       child.stderr?.on("data", (data) => this.appendLog(session, String(data)));
       child.once("error", reject);
-      child.once("exit", (code) => {
+      child.once("close", (code) => {
         if (code === 0) resolve();
         else reject(new Error(`${command.join(" ")} exited with code ${code ?? "unknown"}.`));
       });
@@ -241,6 +290,7 @@ export class StageSessionManager {
     session.updatedAt = new Date().toISOString();
     const child = spawn(executable, args, {
       cwd: worktreeRoot,
+      detached: process.platform !== "win32",
       env: {
         ...process.env,
         EXPO_PUBLIC_STAGE_MODE: project.preview?.mode ?? "stage",
@@ -248,15 +298,15 @@ export class StageSessionManager {
         EXPO_PUBLIC_STAGE_ROUTE: project.preview?.route ?? "/",
       },
     });
-    session.process = child;
+    this.trackProcess(session, child);
     child.stdout?.on("data", (data) => {
       this.appendLog(session, String(data));
-      session.status = "live";
+      if (session.status !== "stopped") session.status = "live";
       session.updatedAt = new Date().toISOString();
     });
     child.stderr?.on("data", (data) => this.appendLog(session, String(data)));
     child.once("error", (error) => {
-      session.status = "failed";
+      if (session.status !== "stopped") session.status = "failed";
       session.error = error.message;
       session.updatedAt = new Date().toISOString();
     });
@@ -265,6 +315,32 @@ export class StageSessionManager {
         session.status = code === 0 ? "stopped" : "failed";
         session.error = code && code !== 0 ? `Metro exited with code ${code}.` : session.error;
         session.updatedAt = new Date().toISOString();
+      }
+    });
+  }
+
+  trackProcess(session: ManagedSession, child: ChildProcess): void {
+    session.process = child;
+    let killer: ReturnType<typeof setTimeout> | undefined;
+    const kill = (signal: NodeJS.Signals) => {
+      try {
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {
+        /* The owned process group has already exited. */
+      }
+    };
+    session.stopProcess = () => {
+      kill("SIGTERM");
+      killer ??= setTimeout(() => kill("SIGKILL"), 2000);
+    };
+    child.once("exit", () => kill("SIGKILL"));
+    child.once("close", () => {
+      kill("SIGKILL");
+      if (killer) clearTimeout(killer);
+      if (session.process === child) {
+        session.process = undefined;
+        session.stopProcess = undefined;
       }
     });
   }
@@ -283,7 +359,12 @@ export class StageSessionManager {
   }
 
   publicSession(session: ManagedSession): StageSessionRef {
-    const { process: _process, ...value } = session;
+    const {
+      process: _process,
+      preparing: _preparing,
+      stopProcess: _stopProcess,
+      ...value
+    } = session;
     return value;
   }
 }

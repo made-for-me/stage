@@ -109,9 +109,44 @@ export function createOpsApi(store: OpsStore, sessions: StageSessionManager) {
         const evidenceScenes = (await sessions.scenes.list({ includeHistory: true })).filter(
           (scene) => evidenceIds.has(scene.id),
         );
+        const executionSessions = stage.sessions.filter(
+          (session) =>
+            session.instanceId &&
+            ["starting", "live"].includes(session.status) &&
+            stage.branches.some(
+              (branch) =>
+                branch.projectId === session.projectId &&
+                branch.name === session.branch &&
+                branch.sha === session.sha &&
+                branch.availability === "available",
+            ),
+        );
         return json(res, 200, {
           contractVersion: opsCapabilities.version,
+          executionPinVersion: opsCapabilities.executionPinVersion,
           ...ops,
+          quests: ops.quests.map((quest) => {
+            const pin = quest.executionTarget?.worktree;
+            const current =
+              pin &&
+              executionSessions.find(
+                (session) =>
+                  session.id === pin.sessionId &&
+                  session.instanceId === pin.sessionInstanceId &&
+                  session.projectId === quest.projectId &&
+                  session.branch === quest.branch &&
+                  session.sha === quest.executionTarget?.sha,
+              );
+            return {
+              ...quest,
+              executionIssue: !quest.executionTarget
+                ? "This revision has no execution pin. Select a checkout when retrying."
+                : pin && !current
+                  ? "The pinned preview changed or stopped. Select a current preview or the source checkout when retrying."
+                  : null,
+            };
+          }),
+          executionSessions,
           branches: stage.branches,
           scenes: stage.scenes,
           evidenceScenes,

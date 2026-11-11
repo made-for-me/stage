@@ -26,10 +26,12 @@ Stage adopts that separation: quest selection, an inspectable result, and agent/
 - Branch-bound capture and preview actions; current-commit scene evidence required for review.
 - Native operations screens and a desktop operations workspace. Original desktop branch library at `/branches`.
 - Provider-neutral JSON tool adapter in `scripts/stage-agent.mjs`.
+- Bounded local command bridge, structured revision feedback, and immutable captured evidence.
+  See [Local worker](../runtime/local-worker.md) for the runnable contract and limitations.
 
 ## Boundaries and next integration
 
-The Grok worker itself is not included: we have not been given its runtime, launch command, or tool registration configuration. The contract is ready for it to claim work and post results. No model API key is needed by Stage. A worker must bring its coding/browser/simulator tools and run a polling or event-driven loop. The included adapter performs requests; it is not an autonomous coding agent.
+The Grok runtime itself is not included: we have not been given its launch command or tool registration configuration. The local bridge now provides polling, leases, bounded process execution and submission; the configured driver brings its coding/browser/simulator tools. No model API key is needed by Stage, and neither adapter is itself an autonomous coding agent.
 
 The Device Hub host must run where devices exist (macOS + Xcode for iOS, Android SDK for Android). This change does not provision that host, proxy video, install Hub into ClubHall, publish an OTA, or produce a TestFlight build. A successful iOS bundle export is not on-device validation.
 

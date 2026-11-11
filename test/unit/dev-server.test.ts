@@ -157,6 +157,8 @@ describe("Stage branch studio API", () => {
       questId: claimed.quest.id,
       agentId: "grok",
       leaseToken: claimed.quest.lease.token,
+      revision: 1,
+      provenance: "worker-reported",
     };
     expect(
       (
@@ -187,10 +189,15 @@ describe("Stage branch studio API", () => {
         )
       ).status,
     ).toBe(200);
+    const submitted = (await (await fetch(`${origin}/api/ops`)).json()) as {
+      quests: { evidence: { id: string } }[];
+    };
     const accept = {
       action: "review",
       questId: worker.questId,
       decision: "accept",
+      revision: 1,
+      evidenceId: submitted.quests[0].evidence.id,
       note: "Meets the criteria",
     };
     expect((await action(accept, true)).status).toBe(403);
@@ -208,7 +215,7 @@ describe("Stage branch studio API", () => {
     const reclaimed = (await (
       await action({ action: "claim", agentId: "grok" }, true)
     ).json()) as typeof claimed;
-    const nextWorker = { ...worker, leaseToken: reclaimed.quest.lease.token };
+    const nextWorker = { ...worker, revision: 2, leaseToken: reclaimed.quest.lease.token };
     const nextStage = (await (await fetch(`${origin}/api/stage`)).json()) as typeof initial;
     const newSceneResponse = await fetch(`${origin}/api/scenes`, {
       method: "POST",
@@ -236,7 +243,11 @@ describe("Stage branch studio API", () => {
         )
       ).status,
     ).toBe(200);
-    expect((await action(accept)).status).toBe(200);
+    const resubmitted = (await (await fetch(`${origin}/api/ops`)).json()) as typeof submitted;
+    expect(
+      (await action({ ...accept, revision: 2, evidenceId: resubmitted.quests[0].evidence.id }))
+        .status,
+    ).toBe(200);
     const done = (await (await fetch(`${origin}/api/ops`)).json()) as {
       quests: { status: string }[];
     };

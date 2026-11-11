@@ -49,4 +49,29 @@ describe("Stage scene store", () => {
 
     expect(await store.list({ projectId: "clubhall", branch: "main", sha: "new-sha" })).toEqual([]);
   });
+  it("keeps previous evidence bytes immutable when the same route and commit are recaptured", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "stage-scenes-"));
+    const store = new StageSceneStore(root);
+    const input = {
+      projectId: "clubhall",
+      branch: "main",
+      sha: "same-commit",
+      title: "Replay",
+      route: "/replay",
+      imageDataUrl: onePixelPng,
+    };
+    const first = await store.save(input);
+    const before = (await store.readImage(first.id))?.content;
+    const changed = Buffer.concat([before as Buffer, Buffer.from("changed image fixture")]);
+    const second = await store.save({
+      ...input,
+      imageDataUrl: `data:image/png;base64,${changed.toString("base64")}`,
+    });
+    const restarted = new StageSceneStore(root);
+    expect(second.id).not.toBe(first.id);
+    expect((await restarted.readImage(first.id))?.content).toEqual(before);
+    expect((await restarted.readImage(second.id))?.content).toEqual(changed);
+    expect((await restarted.list()).map((scene) => scene.id)).toEqual([second.id]);
+    expect(await restarted.list({ includeHistory: true })).toHaveLength(2);
+  });
 });

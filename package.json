@@ -26,7 +26,8 @@
     "preview:clubhall": "node scripts/publish-clubhall-preview.mjs",
     "mobile:build": "pnpm --dir apps/stage-mobile build:testflight",
     "mobile:submit": "pnpm --dir apps/stage-mobile submit:testflight",
-    "mobile:publish-shell": "pnpm --dir apps/stage-mobile publish:shell"
+    "mobile:publish-shell": "pnpm --dir apps/stage-mobile publish:shell",
+    "worker": "node --import tsx scripts/stage-worker.ts"
   },
   "keywords": ["expo", "react-native", "preview", "browser", "devtools"],
   "repository": {

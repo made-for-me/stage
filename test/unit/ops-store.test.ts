@@ -46,4 +46,45 @@ describe("durable agent operations", () => {
     await writeFile(path.join(root, "ops.json"), "broken");
     await expect(store.create(input)).rejects.toThrow();
   });
+  it("preserves legacy submissions without inventing worker provenance", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "stage-ops-"));
+    const store = new OpsStore(root);
+    const created = await store.create(input);
+    const {
+      revision: _revision,
+      submissions: _submissions,
+      reviews: _reviews,
+      ...legacy
+    } = created;
+    await writeFile(
+      path.join(root, "ops.json"),
+      JSON.stringify({
+        version: 1,
+        agents: [],
+        quests: [
+          {
+            ...legacy,
+            status: "review",
+            evidence: {
+              summary: "Old capture",
+              sha: "a".repeat(40),
+              sceneIds: ["old"],
+              sceneHashes: { old: "hash" },
+            },
+          },
+        ],
+      }),
+    );
+    const migrated = (await store.snapshot()).quests[0];
+    expect(migrated.revision).toBe(1);
+    expect(migrated.evidence?.provenance).toBe("legacy");
+    expect(migrated.submissions).toHaveLength(1);
+    await expect(store.review(created.id, "accept", "Accept old data")).rejects.toThrow("legacy");
+    await store.review(created.id, "revise", "Capture a current result");
+    const reopened = (await new OpsStore(root).snapshot()).quests[0];
+    expect(reopened.revision).toBe(2);
+    expect(reopened.evidence).toBeNull();
+    expect(reopened.submissions[0].summary).toBe("Old capture");
+    expect(reopened.reviews[0].evidenceId).toBe(migrated.evidence?.id);
+  });
 });

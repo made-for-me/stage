@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -129,6 +130,7 @@ export class StageSessionManager {
     const now = new Date().toISOString();
     const session: ManagedSession = {
       id,
+      instanceId: randomUUID(),
       projectId: project.id,
       branch: input.branch,
       sha: branch.sha,

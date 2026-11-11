@@ -67,7 +67,7 @@ export async function runWorkerOnce(
     throw new Error(
       "Upgrade the Stage host to operations contract version 2 before running this worker.",
     );
-  if (capabilities.executionPinVersion !== 1)
+  if (![1, 2].includes(capabilities.executionPinVersion as number))
     throw new Error(
       "Upgrade the Stage host to support pinned executor checkouts before running this worker.",
     );
@@ -99,6 +99,8 @@ export async function runWorkerOnce(
   };
   const interval = setInterval(tick, options.heartbeatMs ?? 30_000);
   try {
+    if (quest.executionTarget?.worktree && capabilities.executionPinVersion !== 2)
+      throw new Error("Managed execution sessions require execution pin version 2.");
     const verifiedTarget = await verifyExecutionTarget(cwd, quest, signal);
     await action({
       action: "progress",
@@ -106,6 +108,7 @@ export async function runWorkerOnce(
         ? `Starting simulated local driver for revision ${quest.revision}.`
         : `Starting configured local worker for revision ${quest.revision}.`,
     });
+    if (quest.executionTarget?.worktree) await action({ action: "execution-preflight" });
     const { lease: _lease, ...brief } = quest;
     const result = await execute(
       options.command,

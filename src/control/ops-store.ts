@@ -3,7 +3,17 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type QuestStatus = "queued" | "running" | "blocked" | "review" | "done" | "cancelled";
-export type QuestExecutionTarget = { repositoryRoot: string; branch: string; sha: string };
+export type QuestExecutionTarget = {
+  repositoryRoot: string;
+  branch: string;
+  sha: string;
+  worktree?: {
+    root: string;
+    commonDirectory: string;
+    sessionId: string;
+    sessionInstanceId: string;
+  };
+};
 export type QuestEvidence = {
   id: string;
   revision: number;

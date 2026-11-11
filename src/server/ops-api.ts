@@ -1,7 +1,9 @@
 import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { OpsStore, QuestExecutionTarget } from "../control/ops-store.js";
+import { gitCommonDirectory, verifyExecutionTarget } from "../control/execution-target.js";
+import type { OpsStore, Quest, QuestExecutionTarget } from "../control/ops-store.js";
 import type { StageSessionManager } from "../control/session-manager.js";
+import type { StageSessionRef } from "../types/index.js";
 import { deviceHubStatus } from "./device-hub.js";
 import type { OpsPrincipal } from "./ops-auth.js";
 
@@ -14,15 +16,24 @@ export const opsCapabilities = {
   workflow:
     "claim → heartbeat every 30s → capture/session → upload scenes → submit → operator review",
   leaseMs: 90000,
-  executionPinVersion: 1,
+  executionPinVersion: 2,
   executionPin:
-    "Each revision pins the configured project checkout, named branch and exact Git base; local commands require a clean matching checkout.",
+    "Each revision pins the configured source checkout or an explicitly selected managed session, exact Git base and clean matching checkout.",
   actions: {
     create: {
       role: "operator",
-      fields: ["title", "objective", "criteria: string[]", "projectId", "branch", "assignedTo"],
+      fields: [
+        "title",
+        "objective",
+        "criteria: string[]",
+        "projectId",
+        "branch",
+        "assignedTo",
+        "executionSessionId?: string",
+      ],
     },
     claim: { role: "agent", fields: ["agentId", "instanceId?: unique process identity"] },
+    "execution-preflight": { role: "agent", fields: ["questId", "agentId", "leaseToken"] },
     heartbeat: { role: "agent", fields: ["questId", "agentId", "leaseToken"] },
     progress: { role: "agent", fields: ["questId", "agentId", "leaseToken", "message"] },
     capture: { role: "agent", fields: ["questId", "agentId", "leaseToken"] },
@@ -50,6 +61,7 @@ export const opsCapabilities = {
         "revision",
         "evidenceId: string | null",
         "decision: accept | revise | cancel",
+        "executionSessionId?: string | null (revise only; null selects source checkout)",
         "note",
       ],
     },
@@ -119,7 +131,14 @@ export function createOpsApi(store: OpsStore, sessions: StageSessionManager) {
         const projectId = str(body.projectId, "projectId");
         const branch = str(body.branch, "branch");
         const stage = await sessions.snapshot();
-        const executionTarget = await pinExecutionTarget(stage, projectId, branch);
+        const executionTarget = await pinExecutionTarget(
+          stage,
+          projectId,
+          branch,
+          body.executionSessionId == null
+            ? undefined
+            : str(body.executionSessionId, "executionSessionId"),
+        );
         return json(
           res,
           201,
@@ -164,6 +183,11 @@ export function createOpsApi(store: OpsStore, sessions: StageSessionManager) {
             await sessions.snapshot(),
             q.projectId,
             q.branch,
+            body.executionSessionId === null
+              ? undefined
+              : body.executionSessionId === undefined
+                ? q.executionTarget?.worktree?.sessionId
+                : str(body.executionSessionId, "executionSessionId"),
           );
         }
         if (decision === "accept") {
@@ -195,7 +219,10 @@ export function createOpsApi(store: OpsStore, sessions: StageSessionManager) {
         agentId,
         str(body.leaseToken, "leaseToken"),
         async (q) => {
-          if (action === "heartbeat") return { expiresAt: Date.now() + 90000 };
+          if (action !== "block" && q.executionTarget?.worktree)
+            await verifyManagedSession(q, sessions.listSessions());
+          if (action === "heartbeat" || action === "execution-preflight")
+            return { expiresAt: Date.now() + 90000 };
           if (action === "progress" || action === "block") {
             store.record(q, agentId, str(body.message, "message"));
             if (action === "block") {
@@ -333,6 +360,7 @@ async function pinExecutionTarget(
   stage: Awaited<ReturnType<StageSessionManager["snapshot"]>>,
   projectId: string,
   branchName: string,
+  executionSessionId?: string,
 ): Promise<QuestExecutionTarget> {
   const project = stage.projects.find((p) => p.id === projectId);
   const branch = stage.branches.find((b) => b.projectId === projectId && b.name === branchName);
@@ -340,7 +368,48 @@ async function pinExecutionTarget(
     throw new Error(
       "Select an available configured project and branch before queueing or revising work.",
     );
-  return { repositoryRoot: await realpath(project.localRoot), branch: branchName, sha: branch.sha };
+  const target: QuestExecutionTarget = {
+    repositoryRoot: await realpath(project.localRoot),
+    branch: branchName,
+    sha: branch.sha,
+  };
+  if (executionSessionId) {
+    const session = stage.sessions.find((s) => s.id === executionSessionId);
+    if (!session?.instanceId)
+      throw new Error("Select an existing managed session with an execution instance identity.");
+    target.worktree = {
+      root: await realpath(session.worktreeRoot),
+      commonDirectory: await gitCommonDirectory(target.repositoryRoot),
+      sessionId: session.id,
+      sessionInstanceId: session.instanceId,
+    };
+    const pin = { projectId, branch: branchName, executionTarget: target };
+    await verifyManagedSession(pin, stage.sessions);
+    await verifyExecutionTarget(target.worktree.root, pin, new AbortController().signal);
+  }
+  return target;
+}
+/** Validate the exact managed session incarnation; a reused ID never inherits execution authority. */
+async function verifyManagedSession(
+  quest: Pick<Quest, "projectId" | "branch" | "executionTarget">,
+  sessions: StageSessionRef[],
+): Promise<void> {
+  const target = quest.executionTarget;
+  if (!target?.worktree) return;
+  const pin = target.worktree;
+  const session = sessions.find((s) => s.id === pin.sessionId);
+  if (
+    !session ||
+    session.instanceId !== pin.sessionInstanceId ||
+    session.projectId !== quest.projectId ||
+    session.branch !== quest.branch ||
+    session.sha !== target.sha ||
+    !["starting", "live"].includes(session.status) ||
+    (await realpath(session.worktreeRoot)) !== pin.root
+  )
+    throw new Error(
+      "The pinned managed execution session changed or stopped. Request an operator revision.",
+    );
 }
 function str(value: unknown, field: string, max = 4000): string {
   if (typeof value !== "string" || !value.trim() || value.length > max)

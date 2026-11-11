@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, realpath as realRoot, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -13,6 +13,7 @@ import { runWorkerOnce } from "../../src/control/process-worker.js";
 import { StageSceneStore } from "../../src/control/scene-store.js";
 import type { StageSessionManager } from "../../src/control/session-manager.js";
 import { createOpsApi, opsCapabilities } from "../../src/server/ops-api.js";
+import type { StageSessionRef } from "../../src/types/index.js";
 
 const sha = "a".repeat(40);
 const execFileAsync = promisify(execFile);
@@ -61,7 +62,9 @@ async function setup(driver?: string) {
   const scenes = new StageSceneStore(path.join(root, "scenes"));
   const captures = new StageCaptureStore(path.join(root, "captures"));
   const branch = { projectId: "clubhall", name: "main", sha: baseSha, availability: "available" };
+  const managedSessions: StageSessionRef[] = [];
   const sessions = {
+    listSessions: () => managedSessions,
     captures,
     scenes,
     snapshot: async () => {
@@ -69,7 +72,7 @@ async function setup(driver?: string) {
       return {
         branches: [branch],
         scenes: await scenes.list(),
-        sessions: [],
+        sessions: managedSessions,
         projects: [
           {
             id: "clubhall",
@@ -149,6 +152,7 @@ async function setup(driver?: string) {
     scenes,
     branch,
     actions,
+    managedSessions,
     send,
     options,
     advance: (milliseconds: number) => {
@@ -161,7 +165,203 @@ async function setup(driver?: string) {
   };
 }
 
+async function setupPreview() {
+  const h = await setup();
+  const preview = `${h.root}-preview`;
+  await gitAt(h.root, ["worktree", "add", "--detach", preview, h.sha]);
+  await copyFile(path.join(h.root, "driver.mjs"), path.join(preview, "driver.mjs"));
+  await copyFile(path.join(h.root, "capture.png"), path.join(preview, "capture.png"));
+  h.managedSessions.push({
+    id: "clubhall-main-web",
+    instanceId: "preview-instance-1",
+    projectId: "clubhall",
+    branch: "main",
+    sha: h.sha,
+    target: "web",
+    status: "live",
+    port: 8081,
+    worktreeRoot: preview,
+    previewUrl: "",
+    devClientUrl: "",
+    sdkVersion: null,
+    runtimeFingerprint: null,
+    compatibility: "unknown",
+    startedAt: "",
+    updatedAt: "",
+    logs: [],
+  });
+  const claimed = (await (
+    await h.send({ action: "claim", agentId: input.assignedTo }, "agent")
+  ).json()) as { quest: { lease: { token: string } } };
+  await h.send(
+    {
+      action: "block",
+      questId: h.quest.id,
+      agentId: input.assignedTo,
+      leaseToken: claimed.quest.lease.token,
+      message: "Select a managed preview for execution",
+    },
+    "agent",
+  );
+  const revise = await h.send({
+    action: "review",
+    questId: h.quest.id,
+    revision: 1,
+    evidenceId: null,
+    decision: "revise",
+    note: "Use the explicit managed preview",
+    executionSessionId: h.managedSessions[0].id,
+  });
+  expect(revise.status, await revise.text()).toBe(200);
+  return { ...h, preview, options: { ...h.options, cwd: preview } };
+}
+
 describe("configured local process worker", () => {
+  it("executes a pinned detached managed worktree and preserves its source checkout", async () => {
+    const h = await setupPreview();
+    expect(await runWorkerOnce(h.options)).toBe("review");
+    const brief = JSON.parse(await readFile(path.join(h.preview, "brief-2.json"), "utf8"));
+    expect(brief.verifiedTarget.repositoryRoot).toBe(await realRoot(h.root));
+    expect(brief.verifiedTarget.worktree.root).toBe(await realRoot(h.preview));
+    expect(brief.verifiedTarget.worktree.sessionInstanceId).toBe("preview-instance-1");
+    expect(h.actions).toContain("execution-preflight");
+    expect(await gitAt(h.preview, ["rev-parse", "--abbrev-ref", "HEAD"])).toBe("HEAD");
+    expect(await gitAt(h.root, ["status", "--porcelain=v1"])).toBe("");
+    expect(await gitAt(h.root, ["rev-parse", "HEAD"])).toBe(h.sha);
+    expect(
+      (await h.store.snapshot()).quests[0].evidence?.executionTarget?.worktree?.sessionId,
+    ).toBe("clubhall-main-web");
+  });
+
+  it("rejects a same-SHA clone used as a managed session root", async () => {
+    const h = await setupPreview();
+    const clone = `${h.root}-clone`;
+    await gitAt(h.root, ["clone", "--local", "--no-hardlinks", h.root, clone]);
+    await gitAt(clone, ["checkout", "--detach", h.sha]);
+    h.managedSessions[0].worktreeRoot = clone;
+    const response = await h.send({
+      action: "create",
+      ...input,
+      executionSessionId: "clubhall-main-web",
+    });
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: string }).error).toContain("does not belong");
+    expect(await gitAt(clone, ["rev-parse", "HEAD"])).toBe(h.sha);
+  });
+
+  it("rejects another linked worktree even with the same common directory and SHA", async () => {
+    const h = await setupPreview();
+    const sibling = `${h.root}-sibling`;
+    await gitAt(h.root, ["worktree", "add", "--detach", sibling, h.sha]);
+    expect(await runWorkerOnce({ ...h.options, cwd: sibling })).toBe("blocked");
+    expect((await h.store.snapshot()).quests[0].events.at(-1)?.message).toContain(
+      "Wrong Git checkout",
+    );
+  });
+
+  it("rejects dirty managed worktrees without altering edits", async () => {
+    const h = await setupPreview();
+    await writeFile(path.join(h.preview, "app.txt"), "preserve preview changes\n");
+    await gitAt(h.preview, ["add", "app.txt"]);
+    await writeFile(path.join(h.preview, "notes.txt"), "preserve notes\n");
+    const before = await gitAt(h.preview, ["status", "--porcelain=v1"]);
+    expect(await runWorkerOnce(h.options)).toBe("blocked");
+    expect(await gitAt(h.preview, ["status", "--porcelain=v1"])).toBe(before);
+    expect(await readFile(path.join(h.preview, "app.txt"), "utf8")).toBe(
+      "preserve preview changes\n",
+    );
+  });
+
+  it("rejects managed HEAD drift after its revision was pinned", async () => {
+    const h = await setupPreview();
+    await gitAt(h.preview, ["commit", "--allow-empty", "-m", "Unexpected detached advance"]);
+    expect(await runWorkerOnce(h.options)).toBe("blocked");
+    expect((await h.store.snapshot()).quests[0].events.at(-1)?.message).toContain(
+      "Git base changed",
+    );
+    expect(await gitAt(h.root, ["rev-parse", "HEAD"])).toBe(h.sha);
+  });
+
+  it.each([
+    { instanceId: "replacement-instance" },
+    { projectId: "wrong-project" },
+    { branch: "wrong-branch" },
+    { status: "stopped" as const },
+    { sha: "b".repeat(40) },
+  ])("fences changed managed session mapping before launch: %j", async (change) => {
+    const h = await setupPreview();
+    Object.assign(h.managedSessions[0], change);
+    expect(await runWorkerOnce({ ...h.options, heartbeatMs: 30000 })).toBe("blocked");
+    expect((await h.store.snapshot()).quests[0].events.at(-1)?.message).toContain(
+      "execution session changed or stopped",
+    );
+    await expect(readFile(path.join(h.preview, "brief-2.json"))).rejects.toThrow();
+  });
+
+  it("fences direct evidence actions after session replacement without waiting for a heartbeat", async () => {
+    const h = await setupPreview();
+    const claimed = (await (
+      await h.send({ action: "claim", agentId: input.assignedTo }, "agent")
+    ).json()) as { quest: { lease: { token: string } } };
+    const ownership = {
+      questId: h.quest.id,
+      agentId: input.assignedTo,
+      leaseToken: claimed.quest.lease.token,
+    };
+    h.managedSessions[0].instanceId = "replaced-with-same-public-id";
+    for (const action of ["capture", "submit", "upload"]) {
+      const response = await h.send(
+        {
+          ...ownership,
+          action,
+          revision: 2,
+          sha: h.sha,
+          summary: "Stale session",
+          provenance: "worker-reported",
+          sceneIds: ["stale"],
+          route: "/replay",
+          title: "Replay",
+          imageDataUrl: `data:image/png;base64,${png}`,
+        },
+        "agent",
+        action === "upload" ? "/api/ops/scenes" : "/api/ops/actions",
+      );
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: string }).error).toContain(
+        "execution session changed or stopped",
+      );
+    }
+    expect(await h.scenes.list()).toHaveLength(0);
+    expect((await h.store.snapshot()).quests[0].submissions).toHaveLength(0);
+    expect(
+      (await h.send({ ...ownership, action: "block", message: "Session was replaced" }, "agent"))
+        .status,
+    ).toBe(200);
+  });
+
+  it("terminates a running child when the pinned session instance is replaced", async () => {
+    const h = await setupPreview();
+    await writeFile(
+      path.join(h.preview, "driver.mjs"),
+      `import { writeFile } from 'node:fs/promises'; await writeFile('pid',String(process.pid)); setInterval(()=>{},50);`,
+    );
+    const running = runWorkerOnce(h.options);
+    const rejected = expect(running).rejects.toThrow("execution session changed or stopped");
+    let pid = 0;
+    for (let i = 0; i < 100 && !pid; i++) {
+      try {
+        pid = Number(await readFile(path.join(h.preview, "pid"), "utf8"));
+      } catch {
+        await delay(10);
+      }
+    }
+    expect(pid).toBeGreaterThan(0);
+    h.managedSessions[0].instanceId = "new-session-instance";
+    await rejected;
+    expect(() => process.kill(pid, 0)).toThrow();
+    expect((await h.store.snapshot()).quests[0].submissions).toHaveLength(0);
+  });
+
   it("rejects another checkout even when its branch and commit exactly match", async () => {
     const h = await setup();
     const other = `${h.root}-other`;
